@@ -13,9 +13,11 @@ from credentials import get_openai_client
 from report import STEP_ORDER, build_markdown_report
 
 APP_PASSWORD = "12436"   # shared with the marker in the README
+APP_TITLE = "National Treatment Analyser"
+APP_SUBTITLE = "Step-by-step analysis under GATT 1994 Article III:4"
 TEST_CASE_DIR = Path(__file__).parent / "test_cases"
 
-st.set_page_config(page_title="GATT Article III:4 Analyser", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title=APP_TITLE, page_icon="⚖️", layout="wide")
 
 
 # ---------------------------------------------------------------------------
@@ -26,16 +28,26 @@ def password_ok():
     if st.session_state.get("authenticated"):
         return True
 
-    st.title("GATT Article III:4 Analyser")
-    with st.form("login"):
-        entered = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Enter")
-    if submitted:
-        if hmac.compare_digest(entered, APP_PASSWORD):
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else:
-            st.error("Incorrect password.")
+    # Centre a narrow login box on the page.
+    _, middle, _ = st.columns([1, 1.6, 1])
+    with middle:
+        st.write("")
+        st.write("")
+        st.markdown(f"<h1 style='text-align: center; font-size: 1.85rem;'>⚖️ {APP_TITLE}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: grey;'>{APP_SUBTITLE}</p>",
+                    unsafe_allow_html=True)
+        with st.form("login"):
+            entered = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Enter", type="primary")
+        if submitted:
+            if hmac.compare_digest(entered, APP_PASSWORD):
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+        st.markdown("<p style='text-align: center; color: grey; font-size: 0.85rem;'>"
+                    "LAWS90286 Legal AI, Assignment 2. This tool does not provide legal advice.</p>",
+                    unsafe_allow_html=True)
     return False
 
 
@@ -54,11 +66,12 @@ client = get_openai_client()
 # Input
 # ---------------------------------------------------------------------------
 
-st.title("GATT Article III:4 Analyser")
+st.title(f"⚖️ {APP_TITLE}")
+st.caption(APP_SUBTITLE)
 st.write(
-    "Describe a government measure. The tool analyses, step by step, whether it is "
-    "inconsistent with the national treatment obligation in Article III:4 of the GATT 1994 "
-    "(internal laws, regulations and requirements). It does not analyse internal taxes "
+    "Describe the measure at issue and the relevant facts. The tool analyses, step by step, whether it is "
+    "inconsistent with the national treatment obligation in Article III:4 of the GATT 1994. "
+    "It does not analyse internal taxes "
     "(Article III:2) or justification under Article XX. This is not legal advice."
 )
 
@@ -94,16 +107,26 @@ if test_cases:
         st.write("")
         st.button("Load", on_click=load_test_case)
 
-uploaded = st.file_uploader("Or upload a .txt file describing the measure", type=["txt"])
-if uploaded is not None and st.session_state.get("last_upload") != uploaded.name:
-    st.session_state["measure_text"] = uploaded.read().decode("utf-8", errors="ignore")
-    st.session_state["last_upload"] = uploaded.name
-
 measure_text = st.text_area(
     "Measure description",
     key="measure_text",
     height=220,
     placeholder="Describe the measure, the imported and domestic products, and how each is treated.",
+)
+
+
+def load_uploaded_file():
+    """Copy an uploaded .txt file into the measure description box."""
+    uploaded = st.session_state.get("uploaded_file")
+    if uploaded is not None:
+        st.session_state["measure_text"] = uploaded.getvalue().decode("utf-8", errors="ignore")
+
+
+st.file_uploader(
+    "Or upload a .txt file describing the measure",
+    type=["txt"],
+    key="uploaded_file",
+    on_change=load_uploaded_file,
 )
 
 continue_in_alternative = st.checkbox(
@@ -203,7 +226,8 @@ if output:
         if key in output["results"]:
             show_step(output["results"][key])
 
-    st.caption(f"Model: {output['model']} | AI calls in this run: {output['ai_calls']}")
+    st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
+               f"AI calls in this run: {output['ai_calls']}")
 
     st.download_button(
         "Download report (Markdown)",

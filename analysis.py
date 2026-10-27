@@ -10,6 +10,8 @@ import json
 import re
 from pathlib import Path
 
+from openai import BadRequestError
+
 from prompts import (
     LIKENESS_CRITERIA,
     STEPS,
@@ -131,23 +133,38 @@ class Article3_4Analysis:
         self.client = client
         self.model = model
         self.ai_calls = 0
+        self.use_temperature = True   # switched off if the model rejects temperature
 
     def call_ai_json(self, user_prompt):
         """One AI call that must return a JSON object."""
         self.ai_calls += 1
-        response = self.client.chat.completions.create(
-            model=self.model,
-            temperature=TEMPERATURE,
-            response_format={"type": "json_object"},
-            messages=[
+        request = {
+            "model": self.model,
+            "response_format": {"type": "json_object"},
+            "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-        )
+        }
+        if self.use_temperature:
+            request["temperature"] = TEMPERATURE
+
+        try:
+            response = self.client.chat.completions.create(**request)
+        except BadRequestError as error:
+            # Some newer (reasoning) models do not accept a custom temperature.
+            # Retry once without it and remember this for the rest of the run.
+            if self.use_temperature and "temperature" in str(error).lower():
+                self.use_temperature = False
+                request.pop("temperature")
+                response = self.client.chat.completions.create(**request)
+            else:
+                raise
+
         content = response.choices[0].message.content
         try:
             return json.loads(content)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, TypeError):
             return {"reasoning": "The model did not return valid JSON.", "conclusion": "Uncertain"}
 
     def run_step(self, step_key, measure_text, facts_json="", earlier_results=""):
@@ -221,15 +238,28 @@ class Article3_4Analysis:
         # user did not ask for an alternative analysis.
         stop_early = results["likeness"]["conclusion"] == "No" and not continue_in_alternative
 
+        # If likeness was not established, Steps 7 and 8 are analysed in the alternative.
+        in_alternative = results["likeness"]["conclusion"] != "Yes"
+        alternative_note = ""
+        if in_alternative:
+            alternative_note = (
+                f"NOTE: Step 6 did not find that the products are like products "
+                f"(finding: {results['likeness']['conclusion']}). Analyse this step in the "
+                "alternative, on the assumption that the products are like products, and say so "
+                "at the start of your reasoning."
+            )
+
         if not stop_early:
             report(STEPS["affecting"]["title"])
-            results["affecting"] = self.run_step("affecting", measure_text, facts_json)
+            results["affecting"] = self.run_step("affecting", measure_text, facts_json, alternative_note)
 
             earlier = json.dumps(
                 {"likeness": results["likeness"]["reasoning"],
                  "affecting": results["affecting"]["reasoning"]},
                 indent=2,
             )
+            if alternative_note:
+                earlier = alternative_note + "\n\n" + earlier
             report(STEPS["lft"]["title"])
             results["lft"] = self.run_step("lft", measure_text, facts_json, earlier)
 
@@ -252,8 +282,10 @@ class Article3_4Analysis:
             "outcome": outcome,
             "conclusion": conclusion,
             "stopped_early": stop_early,
+            "in_alternative": in_alternative and not stop_early,
             "ai_calls": self.ai_calls,
             "model": self.model,
+            "temperature": TEMPERATURE if self.use_temperature else "model default",
         }
 
 

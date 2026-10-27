@@ -34,7 +34,9 @@ ELEMENT_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
   "quotes": ["sentences copied character-for-character from AUTHORITIES that support your reasoning"]
 }
 "quotes" must be an empty list if AUTHORITIES is empty or nothing there is relevant.
-Never put text in "quotes" that does not appear word-for-word in AUTHORITIES."""
+Never put text in "quotes" that does not appear word-for-word in AUTHORITIES.
+Your conclusion must be consistent with the facts you list. If no fact in the description \
+supports a 'Yes' or a 'No' answer, the conclusion must be "Uncertain"."""
 
 SCOPE_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
 {
@@ -105,7 +107,11 @@ CONSUMERS_RULE = LIKENESS_GENERAL + """
 For this step, examine only criterion (iii), consumers' tastes and habits: the extent to which \
 consumers perceive and treat the products as alternative means of satisfying a particular want \
 or demand. Evidence of substitution (for example cross-price elasticity) is relevant. Consumers' \
-perceptions of health risks may affect this criterion (Appellate Body, EC – Asbestos)."""
+perceptions of health risks may affect this criterion (Appellate Body, EC – Asbestos). \
+Base this criterion only on facts about how consumers actually or are likely to behave. The \
+regulating Member's policy objective, or the reasons it gives for the measure, is not in itself \
+evidence of consumers' tastes and habits. If the description contains no facts about consumers, \
+answer "Uncertain"."""
 
 TARIFF_RULE = LIKENESS_GENERAL + """
 
@@ -260,6 +266,9 @@ def build_conclusion_prompt(measure_text, outcome, all_results_json):
         "is not established. Otherwise the outcome is uncertain.",
         f"MEASURE DESCRIPTION PROVIDED BY THE USER:\n<<<\n{measure_text}\n>>>",
         f"RESULTS OF ALL STEPS:\n{all_results_json}",
+        "If like products was not answered Yes, describe any findings on the other elements as "
+        "made in the alternative (that is, on the assumption that the products are like products), "
+        "not as settled findings.",
         "If a violation is established, note in next_steps that the responding Member may seek to "
         "justify the measure under GATT Article XX, which this tool does not analyse.",
         CONCLUSION_OUTPUT_FORMAT,
