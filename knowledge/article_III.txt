@@ -1,0 +1,12 @@
+# Source: General Agreement on Tariffs and Trade 1947, Article III paragraphs 1 and 4,
+# and the interpretative Note Ad Article III (incorporated into the GATT 1994).
+# Lines starting with '#' are ignored by the app. Text below must stay verbatim.
+
+GATT Article III:1
+The contracting parties recognize that internal taxes and other internal charges, and laws, regulations and requirements affecting the internal sale, offering for sale, purchase, transportation, distribution or use of products, and internal quantitative regulations requiring the mixture, processing or use of products in specified amounts or proportions, should not be applied to imported or domestic products so as to afford protection to domestic production.
+
+GATT Article III:4
+The products of the territory of any contracting party imported into the territory of any other contracting party shall be accorded treatment no less favourable than that accorded to like products of national origin in respect of all laws, regulations and requirements affecting their internal sale, offering for sale, purchase, transportation, distribution or use. The provisions of this paragraph shall not prevent the application of differential internal transportation charges which are based exclusively on the economic operation of the means of transport and not on the nationality of the product.
+
+Note Ad Article III
+Any internal tax or other internal charge, or any law, regulation or requirement of the kind referred to in paragraph 1 which applies to an imported product and to the like domestic product and is collected or enforced in the case of the imported product at the time or point of importation, is nevertheless to be regarded as an internal tax or other internal charge, or a law, regulation or requirement of the kind referred to in paragraph 1, and is accordingly subject to the provisions of Article III.
