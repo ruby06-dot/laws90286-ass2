@@ -10,7 +10,7 @@ import streamlit as st
 
 from analysis import Article3_4Analysis
 from credentials import get_openai_client
-from report import STEP_ORDER, build_markdown_report
+from report import STEP_ORDER, build_docx_report, build_markdown_report
 
 APP_PASSWORD = "12436"   # shared with the marker in the README
 APP_TITLE = "National Treatment Analyser"
@@ -70,8 +70,8 @@ st.title(f"⚖️ {APP_TITLE}")
 st.caption(APP_SUBTITLE)
 st.write(
     "Describe the measure at issue and the relevant facts. The tool analyses, step by step, whether it is "
-    "inconsistent with the national treatment obligation in Article III:4 of the GATT 1994. "
-    "It does not analyse internal taxes "
+    "inconsistent with the national treatment obligation in Article III:4 of the GATT 1994 "
+    "(internal laws, regulations and requirements). It does not analyse internal taxes "
     "(Article III:2) or justification under Article XX. This is not legal advice."
 )
 
@@ -208,6 +208,9 @@ if output:
         st.info(outcome["scope_warning"])
     if output["stopped_early"]:
         st.caption("Analysis stopped after the like products step, as selected.")
+    if output.get("in_alternative"):
+        st.info("Like products was not established. Steps 7 and 8 were analysed in the "
+                "alternative, on the assumption that the products are like products.")
 
     st.table({"Element": list(outcome["elements"].keys()),
               "Finding": list(outcome["elements"].values())})
@@ -229,9 +232,18 @@ if output:
     st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
                f"AI calls in this run: {output['ai_calls']}")
 
-    st.download_button(
-        "Download report (Markdown)",
-        data=build_markdown_report(st.session_state["analysed_text"], output),
-        file_name="article_III_4_analysis.md",
-        mime="text/markdown",
-    )
+    col_word, col_md, _ = st.columns([1, 1, 2])
+    with col_word:
+        st.download_button(
+            "Download report (Word)",
+            data=build_docx_report(st.session_state["analysed_text"], output),
+            file_name="article_III_4_analysis.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    with col_md:
+        st.download_button(
+            "Download report (Markdown)",
+            data=build_markdown_report(st.session_state["analysed_text"], output),
+            file_name="article_III_4_analysis.md",
+            mime="text/markdown",
+        )
