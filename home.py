@@ -100,11 +100,10 @@ def load_test_case():
 
 test_cases = sorted(p.name for p in TEST_CASE_DIR.glob("*.txt")) if TEST_CASE_DIR.exists() else []
 if test_cases:
-    col_a, col_b = st.columns([3, 1])
+    col_a, col_b = st.columns([5, 1], vertical_alignment="bottom")
     with col_a:
         st.selectbox("Load a test case (optional)", test_cases, key="selected_case")
     with col_b:
-        st.write("")
         st.button("Load", on_click=load_test_case)
 
 measure_text = st.text_area(
