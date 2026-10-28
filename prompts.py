@@ -59,7 +59,8 @@ SCOPE_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
   "domestic_product": "the domestic product it is compared with",
   "differential_treatment": "how the treatment of the imported product differs, in form or in effect",
   "distinction_basis": "origin" or "origin-neutral" or "unclear",
-  "measure_type": "internal_regulation" or "internal_tax" or "border_measure" or "unclear",
+  "measure_type": "internal_regulation" or "internal_tax" or "border_measure" or "unclear" \
+(border_measure covers customs duties, other import charges, import bans and quotas),
   "within_article_III_4": "Yes" or "No" or "Uncertain",
   "scope_reasoning": "a short paragraph explaining the characterisation of the measure",
   "evidence_gaps": ["missing information that matters for scope"],
@@ -78,15 +79,18 @@ CONCLUSION_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
     "affecting": "one or two sentences, or 'Not analysed' if the step was skipped",
     "less_favourable_treatment": "one or two sentences, or 'Not analysed' if the step was skipped"
   },
-  "key_uncertainties": ["the points on which the outcome is most vulnerable"],
-  "next_steps": ["what a lawyer should check or argue next"],
+  "key_uncertainties": ["2 to 4 specific points on which the outcome is most vulnerable, \
+each tied to a step and a missing or contested fact"],
+  "next_steps": ["2 to 4 concrete actions for a lawyer, such as evidence to gather, arguments \
+the other side is likely to raise, or authorities to read"],
   "similar_disputes": [{"case": "a name copied exactly from DISPUTE LIST", \
-"why": "one or two sentences comparing the facts of that dispute with the user's measure"}]
+"why": "two sentences: the main factual similarity, then the main factual difference"}]
 }
 "similar_disputes" lists up to three disputes from DISPUTE LIST whose facts are most similar to \
 the user's measure, most similar first. Compare facts (the kind of measure and how it treats \
-imported products), not just the legal issue. Use only the summaries in DISPUTE LIST. Return an \
-empty list if none is genuinely similar."""
+imported products), not just the legal issue. In "why", do not repeat the summary; say what is \
+similar and what is different. Use only the summaries in DISPUTE LIST. Return an empty list if \
+none is genuinely similar."""
 
 
 # ---------------------------------------------------------------------------
@@ -95,12 +99,23 @@ empty list if none is genuinely similar."""
 
 SCOPE_RULE = """Article III:4 applies to internal laws, regulations and requirements affecting \
 the internal sale, offering for sale, purchase, transportation, distribution or use of products. \
-Internal taxes and other internal charges fall under Article III:2, not Article III:4. \
-Measures applied only at the border to imported products, with no domestic counterpart \
-(for example an import ban or quota), fall under Article XI. Under the Note Ad Article III, \
-a law, regulation or requirement that applies to both the imported product and the like \
-domestic product, but is enforced on the imported product at the time or point of importation, \
-is still an internal measure subject to Article III."""
+Apply these points in order:
+1. Taxes and charges are never 'laws, regulations and requirements' under Article III:4. Internal \
+taxes and other internal charges fall under Article III:2. Customs duties and other charges \
+imposed on or in connection with importation fall under Article II. If the measure is a tax or \
+charge of either kind, the answer is No.
+2. To decide whether a charge is a border charge or an internal charge, what matters is when and \
+why the obligation to pay arises, not when or where the charge is collected (Appellate Body, \
+China – Auto Parts). A charge whose obligation arises at the moment of, and by virtue of, \
+importation is a border charge, even if it is collected later or inside the territory, and even \
+if the Member calls it an internal tax. A charge triggered by an internal event after importation \
+(such as internal sale, use or assembly) is an internal charge.
+3. Measures applied only to imported products at the border, with no domestic counterpart \
+(for example an import ban or quota), fall under Article XI.
+4. Under the Note Ad Article III, a law, regulation or requirement that applies to both the \
+imported product and the like domestic product, but is enforced on the imported product at the \
+time or point of importation, is still an internal measure subject to Article III. The Note does \
+not apply where there is no counterpart measure for like domestic products."""
 
 LIKENESS_GENERAL = """Under Article III:4, 'likeness' is fundamentally a determination about the \
 nature and extent of a competitive relationship between the imported and domestic products \
@@ -285,6 +300,11 @@ def build_conclusion_prompt(measure_text, outcome, all_results_json, dispute_lis
         f"MEASURE DESCRIPTION PROVIDED BY THE USER:\n<<<\n{measure_text}\n>>>",
         f"RESULTS OF ALL STEPS:\n{all_results_json}",
         f"DISPUTE LIST (name: facts of the dispute):\n{dispute_list or '[No disputes listed.]'}",
+        "Use only the facts stated in the MEASURE DESCRIPTION. Do not add facts or change them "
+        "(for example, when, where or by whom something is done).",
+        "If the OUTCOME says that Article III:4 does not apply, explain why, based on Step 1, and "
+        "name the provision that is more likely to apply (for example Article II or Article III:2). "
+        "Describe the findings on the three elements as made in the alternative only.",
         "If like products was not answered Yes, describe any findings on the other elements as "
         "made in the alternative (that is, on the assumption that the products are like products), "
         "not as settled findings.",

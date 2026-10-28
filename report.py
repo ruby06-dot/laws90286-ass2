@@ -26,7 +26,7 @@ def authority_line(source):
     return f"{source['short']}: {source['citation']}" + (f" <{source['url']}>" if source["url"] else "")
 
 
-def build_markdown_report(measure_text, output):
+def build_markdown_report(measure_text, output, review=None):
     outcome = output["outcome"]
     conclusion = output["conclusion"]
     results = output["results"]
@@ -94,10 +94,24 @@ def build_markdown_report(measure_text, output):
 
     lines += ["", "## Table of authorities", bullet_list(
         [authority_line(s) for s in output.get("authorities", [])])]
+
+    if review:
+        lines += ["", "## Human review"]
+        if review["changed"]:
+            lines += [f"**Outcome after review: {review['outcome']['label']}**", "",
+                      f"AI outcome before review: {outcome['label']}", "",
+                      "| Element | AI finding | After human review |", "|---|---|---|"]
+            lines.append(f"| Within Article III:4 (Step 1) | {results['scope']['conclusion']} | "
+                         f"{review['scope']} |")
+            lines += [f"| {name} | {outcome['elements'][name]} | {answer} |"
+                      for name, answer in review["elements"].items()]
+            lines.append("")
+        if review["notes"]:
+            lines += ["**Review notes**", review["notes"]]
     return "\n".join(lines) + "\n"
 
 
-def build_docx_report(measure_text, output):
+def build_docx_report(measure_text, output, review=None):
     """Build the same report as a Word document and return it as bytes."""
     from io import BytesIO
 
@@ -187,6 +201,25 @@ def build_docx_report(measure_text, output):
         doc.add_paragraph(authority_line(source), style="List Bullet")
     if not output.get("authorities"):
         doc.add_paragraph("No authorities were quoted in this analysis.")
+
+    if review:
+        doc.add_heading("Human review", level=1)
+        if review["changed"]:
+            doc.add_paragraph().add_run(f"Outcome after review: {review['outcome']['label']}").bold = True
+            doc.add_paragraph(f"AI outcome before review: {outcome['label']}")
+            table = doc.add_table(rows=1, cols=3)
+            table.style = "Table Grid"
+            for cell, text in zip(table.rows[0].cells, ["Element", "AI finding", "After human review"]):
+                cell.text = text
+            row = table.add_row().cells
+            row[0].text, row[1].text, row[2].text = ("Within Article III:4 (Step 1)",
+                                                     results["scope"]["conclusion"], review["scope"])
+            for name, answer in review["elements"].items():
+                row = table.add_row().cells
+                row[0].text, row[1].text, row[2].text = name, outcome["elements"][name], answer
+        if review["notes"]:
+            doc.add_paragraph().add_run("Review notes").bold = True
+            doc.add_paragraph(review["notes"])
 
     buffer = BytesIO()
     doc.save(buffer)

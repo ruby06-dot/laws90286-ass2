@@ -8,7 +8,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from analysis import Article3_4Analysis
+from analysis import Article3_4Analysis, outcome_from_elements
 from authorities import load_library
 from credentials import get_openai_client, select_model
 from report import STEP_ORDER, build_docx_report, build_markdown_report
@@ -90,7 +90,9 @@ st.write(
 with st.expander("How the analysis works"):
     st.markdown(
         "1. **Facts and scope.** Extract the facts and check that the measure is an internal "
-        "regulation rather than a tax or a border measure.\n"
+        "law, regulation or requirement, rather than a tax, a customs duty or another border "
+        "measure. If it is not, Article III:4 does not apply and the later steps are only an "
+        "alternative analysis.\n"
         "2. **Like products.** Four separate steps for physical properties, end-uses, consumers' "
         "tastes and habits, and tariff classification, then an overall finding.\n"
         "3. **'Affecting' internal sale etc.** Is the measure a law, regulation or requirement "
@@ -161,6 +163,26 @@ run_clicked = st.button("Run analysis", type="primary")
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
+# Every analysis of the current description is kept in st.session_state["runs"],
+# so the same description can be re-run with another model and the runs compared.
+
+def run_analysis(text, chosen_model, continue_alt):
+    """Run the analysis with a progress box. Returns the output, or None on error."""
+    analysis = Article3_4Analysis(client, model=chosen_model)
+    with st.status(f"Running analysis with {chosen_model}...", expanded=True) as status:
+        try:
+            output = analysis.run(text, continue_in_alternative=continue_alt,
+                                  progress=lambda message: st.write(message))
+        except Exception as error:  # show API errors (e.g. invalid key) to the user
+            status.update(label="Analysis failed", state="error")
+            st.error(f"Error: {error}")
+            return None
+        status.update(label=f"Analysis complete ({output['ai_calls']} AI calls)",
+                      state="complete", expanded=False)
+    output["measure_text"] = text
+    output["continue_in_alternative"] = continue_alt
+    return output
+
 
 if run_clicked:
     if client is None:
@@ -168,30 +190,55 @@ if run_clicked:
     elif not measure_text.strip():
         st.warning("Please describe a measure first.")
     else:
-        analysis = Article3_4Analysis(client, model=model)
-        with st.status("Running analysis...", expanded=True) as status:
-            try:
-                output = analysis.run(
-                    measure_text,
-                    continue_in_alternative=continue_in_alternative,
-                    progress=lambda message: st.write(message),
-                )
-                st.session_state["output"] = output
-                st.session_state["analysed_text"] = measure_text
-                status.update(label=f"Analysis complete ({output['ai_calls']} AI calls)",
-                              state="complete", expanded=False)
-            except Exception as error:  # show API errors (e.g. invalid key) to the user
-                status.update(label="Analysis failed", state="error")
-                st.error(f"Error: {error}")
+        new_output = run_analysis(measure_text, model, continue_in_alternative)
+        if new_output:
+            # A new description starts a new set of runs: clear the old review and feedback.
+            for key in [k for k in st.session_state
+                        if str(k).startswith(("review_", "satisfied_", "rerun_model_", "shown_run",
+                                              "saved_widgets"))]:
+                del st.session_state[key]
+            st.session_state["runs"] = [new_output]
 
 
 # ---------------------------------------------------------------------------
-# Output
+# Output helpers
 # ---------------------------------------------------------------------------
+
+BADGES = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain", "Not analysed": "⚪ Not analysed"}
+# The element cards use ticks and crosses, so colour is used only for the overall outcome.
+CARD_MARKS = {"Yes": "✔️ Yes", "No": "✖️ No", "Uncertain": "❓ Uncertain", "Not analysed": "– Not analysed"}
+OUTCOME_SHORT = {"inconsistent": "🔴 Inconsistent", "not_established": "🔵 Not established",
+                 "not_applicable": "🔵 III:4 does not apply",
+                 "uncertain": "🟡 Uncertain"}
+# Red = violation found, blue = violation not established, yellow = cannot decide.
+# Blue (not green) because the tool does not take either party's side.
+OUTCOME_BOX = {"inconsistent": st.error, "not_established": st.info, "not_applicable": st.info,
+               "uncertain": st.warning}
+
 
 def md(text):
     """Stop '$' signs in AI text from being read as maths formatting."""
     return str(text).replace("$", "\\$")
+
+
+def remember(key, default):
+    """Keep a widget's value when it is hidden (e.g. while another run is shown).
+
+    Streamlit forgets the value of a widget that is not drawn, so the value is
+    also stored in st.session_state["saved_widgets"] and restored from there.
+    """
+    saved = st.session_state.setdefault("saved_widgets", {})
+    if key not in st.session_state:
+        st.session_state[key] = saved.get(key, default)
+    return key
+
+
+def save(key):
+    st.session_state["saved_widgets"][key] = st.session_state[key]
+
+
+def run_label(index, run):
+    return f"Run {index + 1} · {run['model']}"
 
 
 def show_list(heading, items):
@@ -215,8 +262,7 @@ def show_facts(heading, facts):
 
 
 def show_step(result):
-    badge = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain"}[result["conclusion"]]
-    with st.expander(f"{result['title']}: {badge}"):
+    with st.expander(f"{result['title']}: {BADGES[result['conclusion']]}"):
         if result.get("rule_applied"):
             st.markdown(f"**Rule applied:** {md(result['rule_applied'])}")
         st.markdown(f"**Reasoning:** {md(result['reasoning'])}")
@@ -249,14 +295,167 @@ def show_table_of_authorities(sources):
         st.markdown(line)
 
 
-output = st.session_state.get("output")
-if output:
+SCOPE_NAME = "Within Article III:4 (Step 1)"
+
+
+def show_human_review(index, output):
+    """Let the user change element findings. The outcome is recalculated by the same rules."""
+    st.markdown("#### ✏️ Change the findings yourself")
+    st.caption("If you disagree with a finding, change it here. The overall outcome is recalculated "
+               "by the same fixed rules. No AI call is made.")
+    scope = output["results"]["scope"]
+    ai_elements = output["outcome"]["elements"]
+    ai_findings = {SCOPE_NAME: scope["conclusion"], **ai_elements}
+    reviewed = {}
+    for column, (name, answer) in zip(st.columns(len(ai_findings)), ai_findings.items()):
+        options = ["Yes", "No", "Uncertain"] + (["Not analysed"] if answer == "Not analysed" else [])
+        with column:
+            key = remember(f"review_{index}_{name}", answer)
+            reviewed[name] = st.selectbox(name, options, key=key, on_change=save, args=(key,))
+    key = remember(f"review_notes_{index}", "")
+    notes = st.text_area("Your notes (included in the report)", key=key, on_change=save, args=(key,))
+
+    changed = [name for name in ai_findings if reviewed[name] != ai_findings[name]]
+    if not changed and not notes.strip():
+        return None
+    reviewed_scope = reviewed.pop(SCOPE_NAME)
+    measure_type = scope["measure_type"] if SCOPE_NAME not in changed else "as decided in human review"
+    reviewed_outcome = outcome_from_elements(reviewed, reviewed_scope, measure_type)
+    if changed:
+        OUTCOME_BOX[reviewed_outcome["status"]](f"Outcome after review: {reviewed_outcome['label']}")
+        st.caption(f"Changed in your review: {', '.join(changed)}. "
+                   f"AI outcome: {output['outcome']['label']}")
+    return {"scope": reviewed_scope, "elements": reviewed, "changed": changed,
+            "outcome": reviewed_outcome, "notes": notes.strip()}
+
+
+def ask_if_satisfied(index):
+    st.subheader("Are you satisfied with this analysis?")
+    key = remember(f"satisfied_{index}", None)
+    return st.radio("Are you satisfied with this analysis?", ["Yes", "No"], horizontal=True,
+                    key=key, on_change=save, args=(key,), label_visibility="collapsed")
+
+
+def show_rerun_option(runs):
+    """Offer to run the same description again with another model."""
+    st.markdown("#### 🔁 Run the analysis again with another model")
+    used = {run["model"] for run in runs}
+    others = [m for m in st.session_state.get("available_models", []) if m not in used]
+    if client is None:
+        st.warning("Enter your API key in the sidebar to run the analysis again.")
+        return
+    if not others:
+        st.info("Every available model has already been tried for this description.")
+        return
+    col_model, col_button = st.columns([3, 2], vertical_alignment="bottom")
+    with col_model:
+        other_model = st.selectbox("Model for the new run", others, key=f"rerun_model_{len(runs)}")
+    with col_button:
+        clicked = st.button(f"Run again with {other_model}")
+    st.caption("A new run makes about the same number of AI calls again, billed to your API key. "
+               "The runs can then be compared below.")
+    if clicked:
+        first = runs[0]
+        new_output = run_analysis(first["measure_text"], other_model, first["continue_in_alternative"])
+        if new_output:
+            runs.append(new_output)
+            st.session_state["show_run_request"] = len(runs) - 1
+            st.rerun()
+
+
+def show_downloads(index, output, review):
+    st.subheader("Download")
+    col_word, col_md, _ = st.columns([1, 1, 2])
+    with col_word:
+        st.download_button(
+            "Download report (Word)",
+            data=build_docx_report(output["measure_text"], output, review),
+            file_name="article_III_4_analysis.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    with col_md:
+        st.download_button(
+            "Download report (Markdown)",
+            data=build_markdown_report(output["measure_text"], output, review),
+            file_name="article_III_4_analysis.md",
+            mime="text/markdown",
+        )
+    note = " and your review" if review else ""
+    st.caption(f"The report covers the run shown above ({run_label(index, output)}){note}.")
+
+
+def run_stats(run):
+    results = run["results"].values()
+    facts = [f for r in results for field in ("supporting_facts", "contrary_factors") for f in r.get(field, [])]
+    quotes = [q for r in results for q in r.get("quotes", [])]
+    removed = sum(len(r.get("removed_quotes", [])) for r in results)
+    corrected = sum(q["status"] == "corrected" for q in quotes)
+    return {
+        "Most similar dispute": run.get("similar_cases", [{}])[0].get("short", "None") if run.get("similar_cases") else "None",
+        "AI calls": str(run["ai_calls"]),
+        "Facts not found in description": f"{sum(not f['verified'] for f in facts)} of {len(facts)}",
+        "Quotes kept / pinpoints corrected / removed": f"{len(quotes)} / {corrected} / {removed}",
+    }
+
+
+def show_model_comparison(runs):
+    """Compare the runs step by step. The comparison is done by code, not by the AI."""
+    st.subheader("Compare models")
+    st.caption("Rows marked ⚠️ are where the models reached different findings.")
+    header = "| | " + " | ".join(run_label(i, r) for i, r in enumerate(runs)) + " | |"
+    lines = [header, "|---" * (len(runs) + 2) + "|"]
+
+    def row(name, values):
+        flag = "⚠️ differs" if len(set(values)) > 1 else "same"
+        lines.append(f"| {name} | " + " | ".join(values) + f" | {flag} |")
+
+    row("**Outcome**", [OUTCOME_SHORT[r["outcome"]["status"]] for r in runs])
+    differing_steps = []
+    for key in STEP_ORDER:
+        values = [BADGES[r["results"][key]["conclusion"]] if key in r["results"] else BADGES["Not analysed"]
+                  for r in runs]
+        title = next(r["results"][key]["title"] for r in runs if key in r["results"]) \
+            if any(key in r["results"] for r in runs) else key
+        row(title, values)
+        if len(set(values)) > 1:
+            differing_steps.append((key, title))
+    stats = [run_stats(r) for r in runs]
+    for name in stats[0]:
+        row(name, [s[name] for s in stats])
+    st.markdown("\n".join(lines))
+
+    for key, title in differing_steps:
+        with st.expander(f"Why the models differ on {title}"):
+            for column, (i, run) in zip(st.columns(len(runs)), enumerate(runs)):
+                with column:
+                    st.markdown(f"**{run_label(i, run)}**")
+                    if key in run["results"]:
+                        result = run["results"][key]
+                        st.markdown(f"{BADGES[result['conclusion']]}  \n{md(result['reasoning'])}")
+                    else:
+                        st.caption("Not analysed in this run.")
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+runs = st.session_state.get("runs", [])
+if runs:
     st.divider()
     st.header("Result")
 
+    index = len(runs) - 1
+    if len(runs) > 1:
+        if "show_run_request" in st.session_state:
+            st.session_state["shown_run"] = st.session_state.pop("show_run_request")
+        index = st.radio("Show the result of", list(range(len(runs))), horizontal=True,
+                         format_func=lambda i: run_label(i, runs[i]), key="shown_run")
+    st.session_state.pop("show_run_request", None)
+    output = runs[index]
+
     outcome = output["outcome"]
-    box = {"inconsistent": st.error, "not_established": st.success, "uncertain": st.warning}
-    box[outcome["status"]](outcome["label"])
+    OUTCOME_BOX[outcome["status"]](outcome["label"])
     if outcome["scope_warning"]:
         st.info(outcome["scope_warning"])
     if output["stopped_early"]:
@@ -265,17 +464,16 @@ if output:
         st.info("Like products was not established. Steps 7 and 8 were analysed in the "
                 "alternative, on the assumption that the products are like products.")
 
-    badges = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain", "Not analysed": "⚪ Not analysed"}
     element_columns = st.columns(len(outcome["elements"]))
     for column, (name, answer) in zip(element_columns, outcome["elements"].items()):
         with column:
             with st.container(border=True):
                 st.caption(name)
-                st.markdown(f"**{badges.get(answer, answer)}**")
+                st.markdown(f"**{CARD_MARKS.get(answer, answer)}**")
 
     conclusion = output["conclusion"]
     st.subheader("Summary")
-    st.write(conclusion.get("executive_summary", ""))
+    st.write(md(conclusion.get("executive_summary", "")))
     col1, col2 = st.columns(2)
     with col1:
         with st.container(border=True):
@@ -304,22 +502,23 @@ if output:
             show_step(output["results"][key])
 
     show_table_of_authorities(output.get("authorities", []))
-
     st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
                f"AI calls in this run: {output['ai_calls']}")
 
-    col_word, col_md, _ = st.columns([1, 1, 2])
-    with col_word:
-        st.download_button(
-            "Download report (Word)",
-            data=build_docx_report(st.session_state["analysed_text"], output),
-            file_name="article_III_4_analysis.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-    with col_md:
-        st.download_button(
-            "Download report (Markdown)",
-            data=build_markdown_report(st.session_state["analysed_text"], output),
-            file_name="article_III_4_analysis.md",
-            mime="text/markdown",
-        )
+    # Satisfied: go straight to the download. Not satisfied: review the findings,
+    # or run again with another model, then download.
+    satisfied = ask_if_satisfied(index)
+    review = None
+    if satisfied == "No":
+        st.write("You can change the findings yourself, run the analysis again with another "
+                 "model, or both.")
+        with st.container(border=True):
+            review = show_human_review(index, output)
+        with st.container(border=True):
+            show_rerun_option(runs)
+
+    if len(runs) > 1:
+        show_model_comparison(runs)
+
+    if satisfied:
+        show_downloads(index, output, review)

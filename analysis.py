@@ -310,6 +310,14 @@ def describe_quote_check(verified, corrected, removed):
     return ", ".join(parts)
 
 
+MEASURE_TYPES = {
+    "border_measure": "a border measure, such as a customs duty, other import charge, ban or quota",
+    "internal_tax": "an internal tax or charge, which falls under Article III:2",
+    "internal_regulation": "found to be outside Article III:4",
+    "unclear": "found to be outside Article III:4",
+}
+
+
 def decide_outcome(results):
     """Boolean logic over the three elements of Article III:4."""
     elements = {
@@ -317,7 +325,20 @@ def decide_outcome(results):
         "Measure affecting internal sale etc.": results.get("affecting", {}).get("conclusion", "Not analysed"),
         "Less favourable treatment": results.get("lft", {}).get("conclusion", "Not analysed"),
     }
+    return outcome_from_elements(elements, results["scope"]["conclusion"], results["scope"]["measure_type"])
+
+
+def outcome_from_elements(elements, scope_conclusion="Yes", measure_type=""):
+    """The same rules, usable again when a lawyer changes an element finding."""
     answers = list(elements.values())
+
+    # Step 1 decides first: if Article III:4 does not apply, no violation of it can exist.
+    if scope_conclusion == "No":
+        described = MEASURE_TYPES.get(measure_type, measure_type)
+        label = (f"Article III:4 does NOT apply to this measure (Step 1: {described}). A violation "
+                 "of Article III:4 cannot be established; the element findings are in the alternative")
+        return {"label": label, "status": "not_applicable", "elements": dict(elements),
+                "scope_warning": None}
 
     if "No" in answers:
         failed = [name for name, answer in elements.items() if answer == "No"]
@@ -331,12 +352,12 @@ def decide_outcome(results):
         status = "uncertain"
 
     scope_warning = None
-    if results["scope"]["conclusion"] != "Yes":
+    if scope_conclusion != "Yes":   # Uncertain: keep the result, but warn
         scope_warning = (
-            "The scope check suggests Article III:4 may not apply to this measure "
-            f"(characterised as: {results['scope']['measure_type']}). "
+            "The scope check could not confirm that Article III:4 applies to this measure "
+            f"(characterised as: {measure_type}). "
             "The element analysis is provided in the alternative."
         )
-        label += ". Note: Article III:4 may not apply (see Step 1)"
+        label += ". Note: it is unclear whether Article III:4 applies (see Step 1)"
 
-    return {"label": label, "status": status, "elements": elements, "scope_warning": scope_warning}
+    return {"label": label, "status": status, "elements": dict(elements), "scope_warning": scope_warning}
