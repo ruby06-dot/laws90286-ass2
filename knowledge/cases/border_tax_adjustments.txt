@@ -1,0 +1,18 @@
+# Border Tax Adjustments
+# What this source is used for: Origin of the four likeness criteria. Add a link to the GATT document if you have one.
+# HOW TO FILL IN THIS FILE
+# 1. Open the official report (link in @url, then the report PDF).
+# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
+#    Remove footnote numbers. Rejoin words split across lines by the PDF.
+# 3. Check that the paragraph number in the header matches the PDF.
+# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
+# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
+#            like (= steps 2 to 6), affecting, lft, all
+# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
+
+
+@short: Border Tax Adjustments
+@citation: Report of the Working Party on Border Tax Adjustments, GATT Doc L/3464 (adopted 2 December 1970) BISD 18S/97
+@url: 
+
+[18 | like]

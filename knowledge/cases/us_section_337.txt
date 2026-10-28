@@ -1,0 +1,22 @@
+# US – Section 337 (GATT Panel)
+# What this source is used for: Effective equality of opportunities; no balancing of more and less favourable treatment. Add a link to the GATT document if you have one.
+# HOW TO FILL IN THIS FILE
+# 1. Open the official report (link in @url, then the report PDF).
+# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
+#    Remove footnote numbers. Rejoin words split across lines by the PDF.
+# 3. Check that the paragraph number in the header matches the PDF.
+# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
+# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
+#            like (= steps 2 to 6), affecting, lft, all
+# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
+
+
+@short: US – Section 337 (GATT Panel)
+@citation: Report of the Panel, United States – Section 337 of the Tariff Act of 1930, GATT Doc L/6439 (adopted 7 November 1989) BISD 36S/345
+@url: 
+@summary: Patent infringement claims against imported products were heard under a special United States procedure (Section 337) that differed from, and was less favourable than, the federal court procedure for domestic products.
+
+[5.11 | lft]
+
+
+[5.14 | lft]

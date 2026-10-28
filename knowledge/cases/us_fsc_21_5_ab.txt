@@ -1,0 +1,25 @@
+# US – FSC (Article 21.5 – EC) (AB)
+# What this source is used for: Broad scope of 'affecting'.
+# HOW TO FILL IN THIS FILE
+# 1. Open the official report (link in @url, then the report PDF).
+# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
+#    Remove footnote numbers. Rejoin words split across lines by the PDF.
+# 3. Check that the paragraph number in the header matches the PDF.
+# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
+# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
+#            like (= steps 2 to 6), affecting, lft, all
+# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
+
+
+@short: US – FSC (Article 21.5 – EC) (AB)
+@citation: Appellate Body Report, United States – Tax Treatment for 'Foreign Sales Corporations' – Recourse to Article 21.5 of the DSU by the European Communities, WTO Doc WT/DS108/AB/RW (14 January 2002)
+@url: https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds108_e.htm
+@summary: A United States tax exclusion for income from export sales was available only for property with no more than 50 per cent foreign content.
+
+[208 | affecting]
+
+
+[209 | affecting]
+
+
+[210 | affecting]

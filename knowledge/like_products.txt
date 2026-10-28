@@ -1,6 +1,0 @@
-# Excerpts for: Like products (Steps 2 to 6)
-# Paste VERBATIM paragraphs copied from the official WTO reports below this header.
-# Suggested reports: EC - Asbestos (AB); Japan - Alcoholic Beverages II (AB); Border Tax Adjustments Working Party Report (1970)
-# Put a source line before each excerpt, for example:
-#   [Appellate Body Report, Korea - Beef, para X]
-# Lines starting with '#' are ignored. Everything else is sent to the AI and used for the quote check.

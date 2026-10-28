@@ -1,4 +1,4 @@
-"""Builds downloadable Markdown and Word reports from the analysis output."""
+"""Builds the downloadable Markdown and Word reports from the analysis output."""
 
 from datetime import date
 
@@ -8,6 +8,22 @@ STEP_ORDER = ["scope", "physical_properties", "end_uses", "consumers", "tariff",
 
 def bullet_list(items):
     return "\n".join(f"- {item}" for item in items) if items else "- None identified"
+
+
+def fact_line(fact):
+    status = "verified in description" if fact["verified"] else "NOT FOUND in description, check"
+    quote = f"\u201c{fact['quote']}\u201d" if fact["quote"] else "(no quote given)"
+    return f"{quote} ({status}): {fact['point']}"
+
+
+def quote_line(quote):
+    note = f" (pinpoint corrected by the app; the AI cited {quote['cited_as']})" \
+        if quote["status"] == "corrected" else ""
+    return f"\u201c{quote['text']}\u201d {quote['source']}{note}"
+
+
+def authority_line(source):
+    return f"{source['short']}: {source['citation']}" + (f" <{source['url']}>" if source["url"] else "")
 
 
 def build_markdown_report(measure_text, output):
@@ -40,6 +56,13 @@ def build_markdown_report(measure_text, output):
     lines += ["### Key uncertainties", bullet_list(conclusion.get("key_uncertainties", [])), ""]
     lines += ["### Next steps", bullet_list(conclusion.get("next_steps", [])), ""]
 
+    similar = output.get("similar_cases", [])
+    if similar:
+        lines += ["## Most similar WTO disputes",
+                  "*Chosen by the AI from short summaries of the disputes; check the reports.*", ""]
+        for case in similar:
+            lines += [f"**{case['short']}**: {case['why']}", f"*Facts: {case['summary']}*", ""]
+
     lines.append("## Step-by-step analysis")
     for key in STEP_ORDER:
         if key not in results:
@@ -53,16 +76,24 @@ def build_markdown_report(measure_text, output):
         ]
         if r.get("rule_applied"):
             lines += [f"**Rule applied:** {r['rule_applied']}", ""]
+        lines += [f"**Reasoning:** {r['reasoning']}", ""]
+        if "supporting_facts" in r:
+            lines += [
+                "**Supporting facts**", bullet_list([fact_line(f) for f in r["supporting_facts"]]), "",
+                "**Contrary factors**", bullet_list([fact_line(f) for f in r["contrary_factors"]]), "",
+                f"*Fact check: {r['fact_check']}*", "",
+            ]
         lines += [
-            f"**Reasoning:** {r['reasoning']}",
-            "",
-            "**Supporting facts**", bullet_list(r.get("supporting_facts", [])), "",
-            "**Contrary factors**", bullet_list(r.get("contrary_factors", [])), "",
             "**Evidence gaps**", bullet_list(r.get("evidence_gaps", [])), "",
-            f"**Quote check:** {r['quote_check']}",
+            f"**Authorities quoted** ({r['quote_check']})",
         ]
         for quote in r.get("quotes", []):
-            lines.append(f"> {quote}")
+            lines.append(f"> {quote_line(quote)}")
+        for quote in r.get("removed_quotes", []):
+            lines.append(f"- Removed (not found in any authority): \u201c{quote['text']}\u201d")
+
+    lines += ["", "## Table of authorities", bullet_list(
+        [authority_line(s) for s in output.get("authorities", [])])]
     return "\n".join(lines) + "\n"
 
 
@@ -110,6 +141,15 @@ def build_docx_report(measure_text, output):
         for item in conclusion.get(key, []) or ["None identified"]:
             doc.add_paragraph(str(item), style="List Bullet")
 
+    if output.get("similar_cases"):
+        doc.add_heading("Most similar WTO disputes", level=1)
+        doc.add_paragraph("Chosen by the AI from short summaries of the disputes; check the reports.").runs[0].italic = True
+        for case in output["similar_cases"]:
+            p = doc.add_paragraph(style="List Bullet")
+            p.add_run(f"{case['short']}: ").bold = True
+            p.add_run(case["why"])
+            doc.add_paragraph(f"Facts: {case['summary']}").runs[0].italic = True
+
     doc.add_heading("Step-by-step analysis", level=1)
     for key in STEP_ORDER:
         if key not in results:
@@ -123,17 +163,30 @@ def build_docx_report(measure_text, output):
         p = doc.add_paragraph()
         p.add_run("Reasoning: ").bold = True
         p.add_run(r["reasoning"])
-        for label, field in [("Supporting facts", "supporting_facts"),
-                             ("Contrary factors", "contrary_factors"),
-                             ("Evidence gaps", "evidence_gaps")]:
+        sections = []
+        if "supporting_facts" in r:
+            sections += [("Supporting facts", [fact_line(f) for f in r["supporting_facts"]]),
+                         ("Contrary factors", [fact_line(f) for f in r["contrary_factors"]])]
+        sections.append(("Evidence gaps", r.get("evidence_gaps", [])))
+        for label, items in sections:
             doc.add_paragraph().add_run(label).bold = True
-            for item in r.get(field, []) or ["None identified"]:
-                doc.add_paragraph(item, style="List Bullet")
+            for item in items or ["None identified"]:
+                doc.add_paragraph(str(item), style="List Bullet")
+        if "fact_check" in r:
+            doc.add_paragraph().add_run(f"Fact check: {r['fact_check']}").italic = True
         p = doc.add_paragraph()
-        p.add_run("Quote check: ").bold = True
+        p.add_run("Authorities quoted: ").bold = True
         p.add_run(str(r["quote_check"]))
         for quote in r.get("quotes", []):
-            doc.add_paragraph(quote, style="Intense Quote")
+            doc.add_paragraph(quote_line(quote), style="Intense Quote")
+        for quote in r.get("removed_quotes", []):
+            doc.add_paragraph(f"Removed (not found in any authority): \u201c{quote['text']}\u201d")
+
+    doc.add_heading("Table of authorities", level=1)
+    for source in output.get("authorities", []) or []:
+        doc.add_paragraph(authority_line(source), style="List Bullet")
+    if not output.get("authorities"):
+        doc.add_paragraph("No authorities were quoted in this analysis.")
 
     buffer = BytesIO()
     doc.save(buffer)

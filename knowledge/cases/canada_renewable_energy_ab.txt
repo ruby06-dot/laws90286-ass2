@@ -1,0 +1,25 @@
+# Canada – Renewable Energy / FIT (AB)
+# What this source is used for: Government procurement exception in Article III:8(a). Find the paragraphs in the Article III:8(a) section and check them.
+# HOW TO FILL IN THIS FILE
+# 1. Open the official report (link in @url, then the report PDF).
+# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
+#    Remove footnote numbers. Rejoin words split across lines by the PDF.
+# 3. Check that the paragraph number in the header matches the PDF.
+# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
+# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
+#            like (= steps 2 to 6), affecting, lft, all
+# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
+
+
+@short: Canada – Renewable Energy / FIT (AB)
+@citation: Appellate Body Report, Canada – Certain Measures Affecting the Renewable Energy Generation Sector; Canada – Measures Relating to the Feed-in Tariff Program, WTO Doc WT/DS412/AB/R, WT/DS426/AB/R (6 May 2013)
+@url: https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds412_e.htm
+@summary: Ontario's feed-in tariff programme guaranteed electricity prices to renewable energy generators only if they used a minimum level of domestic content in their equipment.
+
+[5.63 | scope]
+
+
+[5.74 | scope]
+
+
+[5.79 | scope]

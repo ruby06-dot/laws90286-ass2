@@ -2,8 +2,8 @@
 
 The legal tests in this file are paraphrased summaries of WTO jurisprudence,
 written for this application. They are NOT quotations. Verbatim excerpts from
-the treaty text and Appellate Body / panel reports live in the knowledge/ folder,
-and only those excerpts may be quoted by the model.
+the treaty text and Appellate Body / panel reports live in knowledge/treaty and
+knowledge/cases (see authorities.py), and only those excerpts may be quoted.
 """
 
 SYSTEM_PROMPT = """You are a careful WTO law analyst assisting a lawyer. You analyse whether a \
@@ -23,18 +23,30 @@ tests (for example, do not apply TBT Agreement Article 2.1 or GATT Article XX).
 # Output formats
 # ---------------------------------------------------------------------------
 
+FACT_RULES = """Rules for facts: each "quote" in "supporting_facts" and "contrary_factors" must be \
+one continuous passage copied exactly from the MEASURE DESCRIPTION, with no ellipses, no paraphrase \
+and no added words. Keep it short (a phrase or one sentence). If a point does not rest on a \
+specific passage of the description, put it in "reasoning" or "evidence_gaps" instead."""
+
+QUOTE_RULES = """Rules for authorities: each item in "quotes" must name one SOURCE label from \
+AUTHORITIES and copy text that appears under that SOURCE, character-for-character. "quotes" must \
+be an empty list if nothing in AUTHORITIES is relevant. When your reasoning relies on an \
+authority, cite it by its SOURCE label, for example (Korea – Beef (AB) [137])."""
+
 ELEMENT_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
 {
   "rule_applied": "one or two sentences stating the legal test you applied",
-  "supporting_facts": ["facts from the description that support a 'Yes' answer"],
-  "contrary_factors": ["facts or considerations that point towards 'No'"],
+  "supporting_facts": [{"quote": "a passage copied word-for-word from the MEASURE DESCRIPTION", \
+"point": "why this fact supports a 'Yes' answer"}],
+  "contrary_factors": [{"quote": "a passage copied word-for-word from the MEASURE DESCRIPTION", \
+"point": "why this fact points towards 'No'"}],
   "evidence_gaps": ["missing information that would change or firm up the answer"],
   "reasoning": "a short paragraph applying the test to the facts",
   "conclusion": "Yes" or "No" or "Uncertain",
-  "quotes": ["sentences copied character-for-character from AUTHORITIES that support your reasoning"]
+  "quotes": [{"source": "the SOURCE label exactly as written in AUTHORITIES", \
+"text": "a sentence copied character-for-character from the TEXT under that SOURCE"}]
 }
-"quotes" must be an empty list if AUTHORITIES is empty or nothing there is relevant.
-Never put text in "quotes" that does not appear word-for-word in AUTHORITIES.
+""" + FACT_RULES + "\n" + QUOTE_RULES + """
 Your conclusion must be consistent with the facts you list. Where the description states facts \
 relevant to this step, weigh them and answer "Yes" or "No". Answer "Uncertain" only if the \
 description contains no relevant facts for this step, or the relevant facts point equally both ways."""
@@ -51,10 +63,12 @@ SCOPE_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
   "within_article_III_4": "Yes" or "No" or "Uncertain",
   "scope_reasoning": "a short paragraph explaining the characterisation of the measure",
   "evidence_gaps": ["missing information that matters for scope"],
-  "quotes": ["sentences copied character-for-character from AUTHORITIES; empty list if none"]
+  "quotes": [{"source": "the SOURCE label exactly as written in AUTHORITIES", \
+"text": "a sentence copied character-for-character from the TEXT under that SOURCE"}]
 }
 "distinction_basis" is "origin" only if the measure expressly distinguishes products by their \
-national origin."""
+national origin.
+""" + QUOTE_RULES
 
 CONCLUSION_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
 {
@@ -65,8 +79,14 @@ CONCLUSION_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
     "less_favourable_treatment": "one or two sentences, or 'Not analysed' if the step was skipped"
   },
   "key_uncertainties": ["the points on which the outcome is most vulnerable"],
-  "next_steps": ["what a lawyer should check or argue next"]
-}"""
+  "next_steps": ["what a lawyer should check or argue next"],
+  "similar_disputes": [{"case": "a name copied exactly from DISPUTE LIST", \
+"why": "one or two sentences comparing the facts of that dispute with the user's measure"}]
+}
+"similar_disputes" lists up to three disputes from DISPUTE LIST whose facts are most similar to \
+the user's measure, most similar first. Compare facts (the kind of measure and how it treats \
+imported products), not just the legal issue. Use only the summaries in DISPUTE LIST. Return an \
+empty list if none is genuinely similar."""
 
 
 # ---------------------------------------------------------------------------
@@ -171,49 +191,42 @@ protection to domestic production' (Appellate Body, EC – Bananas III)."""
 STEPS = {
     "scope": {
         "title": "Step 1: Facts and scope of Article III:4",
-        "knowledge_file": None,
         "rule": SCOPE_RULE,
         "question": "Extract the key facts and decide whether the measure is an internal law, "
                     "regulation or requirement within the scope of Article III:4.",
     },
     "physical_properties": {
         "title": "Step 2: Like products, criterion 1 (physical properties)",
-        "knowledge_file": "like_products.txt",
         "rule": PHYSICAL_RULE,
         "question": "Do the physical properties point towards the imported and domestic products "
                     "being 'like'? Answer Yes if they point towards likeness, No if against.",
     },
     "end_uses": {
         "title": "Step 3: Like products, criterion 2 (end-uses)",
-        "knowledge_file": "like_products.txt",
         "rule": END_USES_RULE,
         "question": "Do the end-uses point towards the products being 'like'? "
                     "Answer Yes if they point towards likeness, No if against.",
     },
     "consumers": {
         "title": "Step 4: Like products, criterion 3 (consumers' tastes and habits)",
-        "knowledge_file": "like_products.txt",
         "rule": CONSUMERS_RULE,
         "question": "Do consumers' tastes and habits point towards the products being 'like'? "
                     "Answer Yes if they point towards likeness, No if against.",
     },
     "tariff": {
         "title": "Step 5: Like products, criterion 4 (tariff classification)",
-        "knowledge_file": "like_products.txt",
         "rule": TARIFF_RULE,
         "question": "Does tariff classification point towards the products being 'like'? "
                     "Answer Yes if it points towards likeness, No if against.",
     },
     "likeness": {
         "title": "Step 6: Like products, overall finding",
-        "knowledge_file": "like_products.txt",
         "rule": LIKENESS_SYNTHESIS_RULE,
         "question": "Weighing everything, are the imported and domestic products 'like products' "
                     "under Article III:4? Answer Yes if they are like products.",
     },
     "affecting": {
         "title": "Step 7: Law, regulation or requirement 'affecting' internal sale etc.",
-        "knowledge_file": "affecting.txt",
         "rule": AFFECTING_RULE,
         "question": "Is the measure a law, regulation or requirement affecting the internal sale, "
                     "offering for sale, purchase, transportation, distribution or use of the products? "
@@ -221,7 +234,6 @@ STEPS = {
     },
     "lft": {
         "title": "Step 8: Less favourable treatment",
-        "knowledge_file": "less_favourable_treatment.txt",
         "rule": LFT_RULE,
         "question": "Does the measure accord imported products less favourable treatment than like "
                     "domestic products? Answer Yes if it does.",
@@ -240,12 +252,13 @@ def build_step_prompt(step_key, measure_text, authorities, facts_json="", earlie
     step = STEPS[step_key]
     output_format = SCOPE_OUTPUT_FORMAT if step_key == "scope" else ELEMENT_OUTPUT_FORMAT
     authorities_block = authorities if authorities.strip() else "[No excerpts loaded.]"
+    # Each excerpt is shown as "SOURCE: <short citation>" followed by "TEXT: <verbatim text>".
 
     parts = [
         f"CURRENT STEP: {step['title']}",
         f"QUESTION: {step['question']}",
         f"LEGAL TEST (apply this test only):\n{step['rule']}",
-        f"AUTHORITIES (verbatim excerpts; only these may be quoted):\n<<<\n{authorities_block}\n>>>",
+        f"AUTHORITIES (verbatim excerpts, each with a SOURCE label; only these may be quoted):\n<<<\n{authorities_block}\n>>>",
         f"MEASURE DESCRIPTION PROVIDED BY THE USER:\n<<<\n{measure_text}\n>>>",
     ]
     if facts_json:
@@ -256,7 +269,7 @@ def build_step_prompt(step_key, measure_text, authorities, facts_json="", earlie
     return "\n\n".join(parts)
 
 
-def build_conclusion_prompt(measure_text, outcome, all_results_json):
+def build_conclusion_prompt(measure_text, outcome, all_results_json, dispute_list=""):
     """Build the user prompt for the final conclusion step.
 
     The outcome is decided by Python (boolean logic over the three elements).
@@ -271,6 +284,7 @@ def build_conclusion_prompt(measure_text, outcome, all_results_json):
         "is not established. Otherwise the outcome is uncertain.",
         f"MEASURE DESCRIPTION PROVIDED BY THE USER:\n<<<\n{measure_text}\n>>>",
         f"RESULTS OF ALL STEPS:\n{all_results_json}",
+        f"DISPUTE LIST (name: facts of the dispute):\n{dispute_list or '[No disputes listed.]'}",
         "If like products was not answered Yes, describe any findings on the other elements as "
         "made in the alternative (that is, on the assumption that the products are like products), "
         "not as settled findings.",

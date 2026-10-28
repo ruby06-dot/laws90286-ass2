@@ -1,0 +1,22 @@
+# US – Clove Cigarettes (AB)
+# What this source is used for: A TBT Article 2.1 case. Use only for its discussion of likeness as a competitive relationship, by analogy.
+# HOW TO FILL IN THIS FILE
+# 1. Open the official report (link in @url, then the report PDF).
+# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
+#    Remove footnote numbers. Rejoin words split across lines by the PDF.
+# 3. Check that the paragraph number in the header matches the PDF.
+# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
+# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
+#            like (= steps 2 to 6), affecting, lft, all
+# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
+
+
+@short: US – Clove Cigarettes (AB)
+@citation: Appellate Body Report, United States – Measures Affecting the Production and Sale of Clove Cigarettes, WTO Doc WT/DS406/AB/R (4 April 2012)
+@url: https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds406_e.htm
+@summary: The United States banned flavoured cigarettes, including clove cigarettes mainly imported from Indonesia, while exempting menthol cigarettes mainly produced domestically (a TBT Article 2.1 case).
+
+[119 | like]
+
+
+[120 | like]

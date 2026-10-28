@@ -9,10 +9,11 @@ from pathlib import Path
 import streamlit as st
 
 from analysis import Article3_4Analysis
-from credentials import get_openai_client
+from authorities import load_library
+from credentials import get_openai_client, select_model
 from report import STEP_ORDER, build_docx_report, build_markdown_report
 
-APP_PASSWORD = "12436"   # shared with the marker in the README
+APP_PASSWORD = "12436"   # repository is private; move to Streamlit secrets before making it public
 APP_TITLE = "National Treatment Analyser"
 APP_SUBTITLE = "Step-by-step analysis under GATT 1994 Article III:4"
 TEST_CASE_DIR = Path(__file__).parent / "test_cases"
@@ -70,6 +71,7 @@ if not password_ok():
 # ---------------------------------------------------------------------------
 
 client = get_openai_client()
+model = select_model(client)
 
 
 # ---------------------------------------------------------------------------
@@ -97,9 +99,19 @@ with st.expander("How the analysis works"):
         "to the detriment of imported products?\n"
         "5. **Conclusion.** The outcome is decided by fixed rules: a violation is established "
         "only if all three elements are met. The AI then explains the outcome.\n\n"
-        "Every quote the AI gives is checked word-for-word against the source texts by "
-        "ordinary code. Quotes that fail the check are retried and then removed."
+        "**Two checks by ordinary code (no AI):**\n"
+        "- Every quote from a WTO report or the GATT must appear word-for-word in the paragraph "
+        "it cites. A quote found in a different paragraph has its pinpoint corrected; a quote "
+        "found nowhere is removed.\n"
+        "- Every fact the AI relies on must appear word-for-word in your description. Facts that "
+        "fail are marked ⚠️ for you to check.\n\n"
+        "Failed checks are first sent back to the AI for another attempt."
     )
+
+# Warn about formatting problems in the knowledge files (shown only if there are any).
+for source in load_library():
+    for problem in source["problems"]:
+        st.warning(f"knowledge file {source['id']}.txt: {problem}")
 
 
 def load_test_case():
@@ -156,7 +168,7 @@ if run_clicked:
     elif not measure_text.strip():
         st.warning("Please describe a measure first.")
     else:
-        analysis = Article3_4Analysis(client)
+        analysis = Article3_4Analysis(client, model=model)
         with st.status("Running analysis...", expanded=True) as status:
             try:
                 output = analysis.run(
@@ -177,32 +189,64 @@ if run_clicked:
 # Output
 # ---------------------------------------------------------------------------
 
+def md(text):
+    """Stop '$' signs in AI text from being read as maths formatting."""
+    return str(text).replace("$", "\\$")
+
+
 def show_list(heading, items):
     st.markdown(f"**{heading}**")
     if items:
-        st.markdown("\n".join(f"- {item}" for item in items))
+        st.markdown("\n".join(f"- {md(item)}" for item in items))
     else:
         st.caption("None identified")
+
+
+def show_facts(heading, facts):
+    st.markdown(f"**{heading}**")
+    if not facts:
+        st.caption("None identified")
+    for fact in facts:
+        icon = "✅" if fact["verified"] else "⚠️"
+        quote = f"“{md(fact['quote'])}”" if fact["quote"] else "(no quote given)"
+        st.markdown(f"{icon} *{quote}*  \n{md(fact['point'])}")
+        if not fact["verified"]:
+            st.caption("Not found word-for-word in the measure description. Please check this fact.")
 
 
 def show_step(result):
     badge = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain"}[result["conclusion"]]
     with st.expander(f"{result['title']}: {badge}"):
         if result.get("rule_applied"):
-            st.markdown(f"**Rule applied:** {result['rule_applied']}")
-        st.markdown(f"**Reasoning:** {result['reasoning']}")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            show_list("Supporting facts", result.get("supporting_facts", []))
-        with col2:
-            show_list("Contrary factors", result.get("contrary_factors", []))
-        with col3:
-            show_list("Evidence gaps", result.get("evidence_gaps", []))
-        st.markdown(f"**Quote check:** {result['quote_check']} (attempts: {result['attempts']})")
+            st.markdown(f"**Rule applied:** {md(result['rule_applied'])}")
+        st.markdown(f"**Reasoning:** {md(result['reasoning'])}")
+        if "supporting_facts" in result:
+            col1, col2 = st.columns(2)
+            with col1:
+                show_facts("Supporting facts", result["supporting_facts"])
+            with col2:
+                show_facts("Contrary factors", result["contrary_factors"])
+            st.caption(f"Fact check: {result['fact_check']}")
+        show_list("Evidence gaps", result.get("evidence_gaps", []))
+
+        st.markdown(f"**Authorities quoted** ({result['quote_check']}; attempts: {result['attempts']})")
         for quote in result.get("quotes", []):
-            st.markdown(f"> {quote}")
+            st.markdown(f"> {md(quote['text'])}\n>\n> *{quote['source']}*")
+            if quote["status"] == "corrected":
+                st.caption(f"Pinpoint corrected by the app. The AI cited “{quote['cited_as']}”.")
         for quote in result.get("removed_quotes", []):
-            st.caption(f"Removed (not found in sources): {quote}")
+            st.caption(f"Removed (not found in any authority): “{quote['text']}” [{quote['source']}]")
+
+
+def show_table_of_authorities(sources):
+    st.subheader("Table of authorities")
+    if not sources:
+        st.caption("No authorities were quoted in this analysis.")
+    for source in sources:
+        line = f"- **{source['short']}**: {source['citation']}"
+        if source["url"]:
+            line += f" ([WTO page]({source['url']}))"
+        st.markdown(line)
 
 
 output = st.session_state.get("output")
@@ -240,10 +284,26 @@ if output:
         with st.container(border=True):
             show_list("➡️ Next steps", conclusion.get("next_steps", []))
 
+    similar = output.get("similar_cases", [])
+    if similar:
+        st.subheader("Most similar WTO disputes")
+        st.caption("Chosen by the AI by comparing your facts with short summaries of the disputes "
+                   "in the knowledge base. Read the reports before relying on the comparison.")
+        for case in similar:
+            with st.container(border=True):
+                title = f"**{case['short']}**"
+                if case["url"]:
+                    title += f" ([WTO page]({case['url']}))"
+                st.markdown(title)
+                st.caption(md(case["summary"]))
+                st.markdown(md(case["why"]))
+
     st.subheader("Step-by-step analysis")
     for key in STEP_ORDER:
         if key in output["results"]:
             show_step(output["results"][key])
+
+    show_table_of_authorities(output.get("authorities", []))
 
     st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
                f"AI calls in this run: {output['ai_calls']}")

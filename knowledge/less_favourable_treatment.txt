@@ -1,6 +1,0 @@
-# Excerpts for: Less favourable treatment (Step 8)
-# Paste VERBATIM paragraphs copied from the official WTO reports below this header.
-# Suggested reports: Korea - Beef (AB); EC - Asbestos (AB); US - Section 337 (GATT Panel); Thailand - Cigarettes (Philippines) (AB); EC - Seal Products (AB)
-# Put a source line before each excerpt, for example:
-#   [Appellate Body Report, Korea - Beef, para X]
-# Lines starting with '#' are ignored. Everything else is sent to the AI and used for the quote check.
