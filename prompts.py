@@ -35,8 +35,9 @@ ELEMENT_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
 }
 "quotes" must be an empty list if AUTHORITIES is empty or nothing there is relevant.
 Never put text in "quotes" that does not appear word-for-word in AUTHORITIES.
-Your conclusion must be consistent with the facts you list. If no fact in the description \
-supports a 'Yes' or a 'No' answer, the conclusion must be "Uncertain"."""
+Your conclusion must be consistent with the facts you list. Where the description states facts \
+relevant to this step, weigh them and answer "Yes" or "No". Answer "Uncertain" only if the \
+description contains no relevant facts for this step, or the relevant facts point equally both ways."""
 
 SCOPE_OUTPUT_FORMAT = """Return a JSON object with exactly these keys:
 {
@@ -94,7 +95,9 @@ PHYSICAL_RULE = LIKENESS_GENERAL + """
 For this step, examine only criterion (i), physical properties: the products' composition, \
 nature and quality. Physical differences matter to the extent that they affect the competitive \
 relationship. Evidence of health risks associated with a product's physical properties may be \
-relevant (Appellate Body, EC – Asbestos)."""
+relevant (Appellate Body, EC – Asbestos). A health risk that results from a product's composition \
+(for example, a fibre that is carcinogenic) is a fact about its physical properties and should be \
+weighed here."""
 
 END_USES_RULE = LIKENESS_GENERAL + """
 
@@ -108,10 +111,12 @@ For this step, examine only criterion (iii), consumers' tastes and habits: the e
 consumers perceive and treat the products as alternative means of satisfying a particular want \
 or demand. Evidence of substitution (for example cross-price elasticity) is relevant. Consumers' \
 perceptions of health risks may affect this criterion (Appellate Body, EC – Asbestos). \
-Base this criterion only on facts about how consumers actually or are likely to behave. The \
-regulating Member's policy objective, or the reasons it gives for the measure, is not in itself \
-evidence of consumers' tastes and habits. If the description contains no facts about consumers, \
-answer "Uncertain"."""
+Consumers include commercial purchasers and users, such as manufacturers or construction firms, \
+not only final consumers. Facts about how these purchasers actually behave, including avoiding a \
+product because of health or safety concerns, are relevant and should be weighed. However, the \
+regulating Member's own policy objective, or the reasons it gives for the measure, is not by \
+itself evidence of consumers' tastes and habits. If the description contains no facts about how \
+purchasers or consumers behave, answer "Uncertain"."""
 
 TARIFF_RULE = LIKENESS_GENERAL + """
 

@@ -36,6 +36,16 @@ def password_ok():
         st.markdown(f"<h1 style='text-align: center; font-size: 1.85rem;'>⚖️ {APP_TITLE}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; color: grey;'>{APP_SUBTITLE}</p>",
                     unsafe_allow_html=True)
+        # Centre the Enter button inside the login form.
+        st.markdown(
+            "<style>"
+            "div[data-testid='stElementContainer']:has(div[data-testid='stFormSubmitButton']),"
+            "div:has(> div[data-testid='stFormSubmitButton']),"
+            "div[data-testid='stFormSubmitButton'] {width: 100%; display: flex; justify-content: center;}"
+            "div[data-testid='stFormSubmitButton'] button {width: auto; padding: 0 2rem;}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
         with st.form("login"):
             entered = st.text_input("Password", type="password")
             submitted = st.form_submit_button("Enter", type="primary")
@@ -211,17 +221,24 @@ if output:
         st.info("Like products was not established. Steps 7 and 8 were analysed in the "
                 "alternative, on the assumption that the products are like products.")
 
-    st.table({"Element": list(outcome["elements"].keys()),
-              "Finding": list(outcome["elements"].values())})
+    badges = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain", "Not analysed": "⚪ Not analysed"}
+    element_columns = st.columns(len(outcome["elements"]))
+    for column, (name, answer) in zip(element_columns, outcome["elements"].items()):
+        with column:
+            with st.container(border=True):
+                st.caption(name)
+                st.markdown(f"**{badges.get(answer, answer)}**")
 
     conclusion = output["conclusion"]
     st.subheader("Summary")
     st.write(conclusion.get("executive_summary", ""))
     col1, col2 = st.columns(2)
     with col1:
-        show_list("Key uncertainties", conclusion.get("key_uncertainties", []))
+        with st.container(border=True):
+            show_list("⚠️ Key uncertainties", conclusion.get("key_uncertainties", []))
     with col2:
-        show_list("Next steps", conclusion.get("next_steps", []))
+        with st.container(border=True):
+            show_list("➡️ Next steps", conclusion.get("next_steps", []))
 
     st.subheader("Step-by-step analysis")
     for key in STEP_ORDER:
