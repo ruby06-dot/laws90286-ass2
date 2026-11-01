@@ -10,17 +10,17 @@ from pathlib import Path
 
 import streamlit as st
 
-from analysis import Article3_4Analysis, outcome_from_elements
+from analysis import Article3_4Analysis
 from authorities import load_library
 from credentials import get_openai_client, select_model
-from report import STEP_ORDER, build_docx_report, build_markdown_report
+from report import (STEP_ORDER, build_docx_report, build_markdown_report, comparison_rows,
+                    run_label)
 
 APP_PASSWORD = "12436"   # repository is private; move to Streamlit secrets before making it public
 APP_TITLE = "National Treatment Analyser"
 APP_SUBTITLE = "Step-by-step analysis under GATT 1994 Article III:4"
 TEST_CASE_DIR = Path(__file__).parent / "test_cases"
-TAB_OVERVIEW, TAB_STEPS, TAB_REVIEW, TAB_COMPARE = (
-    "📋 Overview", "🔍 Step-by-step", "✏️ Review & re-run", "⚖️ Compare models")
+TAB_OVERVIEW, TAB_STEPS, TAB_REVIEW = "📋 Overview", "🔍 Step-by-step", "✏️ Revise & re-run"
 
 st.set_page_config(page_title=APP_TITLE, page_icon="⚖️", layout="wide")
 
@@ -253,7 +253,7 @@ if run_clicked:
         if new_output:
             # A new description starts a new set of runs: clear the old review and feedback.
             for key in [k for k in st.session_state
-                        if str(k).startswith(("review_", "satisfied_", "rerun_model_", "shown_run",
+                        if str(k).startswith(("revise_", "notes_", "satisfied_", "shown_run",
                                               "saved_widgets"))]:
                 del st.session_state[key]
             st.session_state["runs"] = [new_output]
@@ -268,10 +268,6 @@ BADGES = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain", "No
 OUTCOME_SHORT = {"inconsistent": "🔴 Inconsistent", "not_established": "🔵 Not established",
                  "not_applicable": "🔵 III:4 does not apply",
                  "uncertain": "🟡 Uncertain"}
-# Red = violation found, blue = violation not established, yellow = cannot decide.
-# Blue (not green) because the tool does not take either party's side.
-OUTCOME_BOX = {"inconsistent": st.error, "not_established": st.info, "not_applicable": st.info,
-               "uncertain": st.warning}
 
 
 def md(text):
@@ -293,10 +289,6 @@ def remember(key, default):
 
 def save(key):
     st.session_state["saved_widgets"][key] = st.session_state[key]
-
-
-def run_label(index, run):
-    return f"Run {index + 1} · {run['model']}"
 
 
 def show_list(heading, items):
@@ -353,40 +345,6 @@ def show_table_of_authorities(sources):
         st.markdown(line)
 
 
-SCOPE_NAME = "Within Article III:4 (Step 1)"
-
-
-def show_human_review(index, output):
-    """Let the user change element findings. The outcome is recalculated by the same rules."""
-    st.markdown("#### ✏️ Change the findings yourself")
-    st.caption("If you disagree with a finding, change it here. The overall outcome is recalculated "
-               "by the same fixed rules. No AI call is made.")
-    scope = output["results"]["scope"]
-    ai_elements = output["outcome"]["elements"]
-    ai_findings = {SCOPE_NAME: scope["conclusion"], **ai_elements}
-    reviewed = {}
-    for column, (name, answer) in zip(st.columns(len(ai_findings)), ai_findings.items()):
-        options = ["Yes", "No", "Uncertain"] + (["Not analysed"] if answer == "Not analysed" else [])
-        with column:
-            key = remember(f"review_{index}_{name}", answer)
-            reviewed[name] = st.selectbox(name, options, key=key, on_change=save, args=(key,))
-    key = remember(f"review_notes_{index}", "")
-    notes = st.text_area("Your notes (included in the report)", key=key, on_change=save, args=(key,))
-
-    changed = [name for name in ai_findings if reviewed[name] != ai_findings[name]]
-    if not changed and not notes.strip():
-        return None
-    reviewed_scope = reviewed.pop(SCOPE_NAME)
-    measure_type = scope["measure_type"] if SCOPE_NAME not in changed else "as decided in human review"
-    reviewed_outcome = outcome_from_elements(reviewed, reviewed_scope, measure_type)
-    if changed:
-        OUTCOME_BOX[reviewed_outcome["status"]](f"Outcome after review: {reviewed_outcome['label']}")
-        st.caption(f"Changed in your review: {', '.join(changed)}. "
-                   f"AI outcome: {output['outcome']['label']}")
-    return {"scope": reviewed_scope, "elements": reviewed, "changed": changed,
-            "outcome": reviewed_outcome, "notes": notes.strip()}
-
-
 def ask_if_satisfied(index):
     st.subheader("Are you satisfied with this analysis?")
     key = remember(f"satisfied_{index}", None)
@@ -394,45 +352,93 @@ def ask_if_satisfied(index):
                     key=key, on_change=satisfied_changed, args=(key,), label_visibility="collapsed")
 
 
-def show_rerun_option(runs):
-    """Offer to run the same description again with another model."""
-    st.markdown("#### 🔁 Run the analysis again with another model")
-    used = {run["model"] for run in runs}
-    others = [m for m in st.session_state.get("available_models", []) if m not in used]
+def show_revise_and_rerun(index, output, runs):
+    """Let the user correct or add to the facts, choose a model, and run the analysis again."""
+    st.markdown("#### ✏️ Revise the facts and run again")
+    st.caption("Correct or add to the facts, or point out what the analysis should take into account. "
+               "Then choose a model and run the analysis again. The new run is kept next to the "
+               "earlier ones so that you can compare them.")
+    key_text = remember(f"revise_text_{index}", output.get("base_text", output["measure_text"]))
+    new_text = st.text_area("Measure description (edit as needed)", key=key_text, height=200,
+                            on_change=save, args=(key_text,))
+    key_clar = remember(f"revise_clar_{index}", "")
+    clarification = st.text_area(
+        "Points to emphasise or clarify (optional)", key=key_clar, height=90, on_change=save,
+        args=(key_clar,),
+        placeholder="For example: construction firms, not households, are the main buyers of these products.")
+    st.caption("These points are added to the description as additional facts, so every fact the AI "
+               "relies on is still checked against your text.")
+
     if client is None:
         st.warning("Enter your API key in the sidebar to run the analysis again.")
         return
-    if not others:
-        st.info("Every available model has already been tried for this description.")
-        return
+    models = st.session_state.get("available_models") or [output["model"]]
+    if output["model"] not in models:
+        models = [output["model"]] + models
     col_model, col_button = st.columns([3, 2], vertical_alignment="bottom")
     with col_model:
-        other_model = st.selectbox("Model for the new run", others, key=f"rerun_model_{len(runs)}")
+        key_model = remember(f"revise_model_{index}", output["model"])
+        chosen = st.selectbox("Model for the new run", models, key=key_model, on_change=save,
+                              args=(key_model,))
     with col_button:
-        clicked = st.button(f"Run again with {other_model}")
-    st.caption("A new run makes about the same number of AI calls again, billed to your API key. "
-               "The runs can then be compared below.")
-    if clicked:
-        first = runs[0]
-        new_output = run_analysis(first["measure_text"], other_model, first["continue_in_alternative"])
-        if new_output:
-            runs.append(new_output)
-            st.session_state["show_run_request"] = len(runs) - 1
-            st.session_state["tab_request"] = TAB_COMPARE
-            st.rerun()
+        clicked = st.button("🔁 Run the analysis again", type="primary", key=f"revise_run_{index}")
+    st.caption("A new run makes about the same number of AI calls again, billed to your API key.")
+
+    if not clicked:
+        return
+    if not new_text.strip():
+        st.warning("The measure description is empty.")
+        return
+    text = new_text.strip()
+    if clarification.strip():
+        text += "\n\nAdditional facts and clarifications from the user:\n" + clarification.strip()
+    if text == output["measure_text"].strip() and chosen == output["model"]:
+        st.info("Nothing has changed. The same facts and the same model give almost the same result. "
+                "Edit the facts, add a point to emphasise, or choose another model.")
+        return
+    new_output = run_analysis(text, chosen, runs[0]["continue_in_alternative"])
+    if new_output:
+        new_output["base_text"] = new_text.strip()
+        new_output["clarification"] = clarification.strip()
+        new_output["revised"] = text != runs[0]["measure_text"].strip()
+        runs.append(new_output)
+        st.session_state["show_run_request"] = len(runs) - 1
+        st.session_state["tab_request"] = TAB_OVERVIEW
+        st.rerun()
 
 
-def show_downloads(index, output, review, where):
+def show_notes(index):
+    st.markdown("#### 📝 Your notes")
+    key = remember(f"notes_{index}", "")
+    notes = st.text_area("Your notes (included in the report)", key=key, height=120,
+                         on_change=save, args=(key,), label_visibility="collapsed",
+                         placeholder="Your own comments on this analysis. They are added to the report.")
+    return {"notes": notes.strip()} if notes.strip() else None
+
+
+def saved_notes(index):
+    """The notes typed in the Revise & re-run tab for this run, if any."""
+    notes = st.session_state.get("saved_widgets", {}).get(f"notes_{index}", "").strip()
+    return {"notes": notes} if notes else None
+
+
+def show_downloads(index, output, review, where, runs):
     with st.container(border=True):
         st.markdown("#### 📥 Download the report")
-        note = " and your review" if review else ""
-        st.caption(f"The report covers {run_label(index, output)}{note}: the outcome, every step, "
-                   "the facts and quotes with their check results, and the table of authorities.")
+        parts = ["the outcome", "every step", "the facts and quotes with their check results",
+                 "the table of authorities"]
+        if len(runs) > 1:
+            parts.append("a comparison with the other run" if len(runs) == 2
+                         else f"a comparison of all {len(runs)} runs of this description")
+        if review:
+            parts.append("your notes")
+        st.caption(f"The report covers {run_label(index, output)}: " + ", ".join(parts[:-1])
+                   + f" and {parts[-1]}.")
         col_word, col_md, _ = st.columns([1, 1, 1])
         with col_word:
             st.download_button(
                 "⬇️ Word report (.docx)", type="primary", use_container_width=True,
-                data=build_docx_report(output["measure_text"], output, review),
+                data=build_docx_report(output["measure_text"], output, review, runs),
                 file_name="article_III_4_analysis.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 key=f"docx_{where}_{index}",
@@ -440,65 +446,49 @@ def show_downloads(index, output, review, where):
         with col_md:
             st.download_button(
                 "⬇️ Markdown report (.md)", use_container_width=True,
-                data=build_markdown_report(output["measure_text"], output, review),
+                data=build_markdown_report(output["measure_text"], output, review, runs),
                 file_name="article_III_4_analysis.md", mime="text/markdown",
                 key=f"md_{where}_{index}",
             )
 
 
-def run_stats(run):
-    results = run["results"].values()
-    facts = [f for r in results for field in ("supporting_facts", "contrary_factors") for f in r.get(field, [])]
-    quotes = [q for r in results for q in r.get("quotes", [])]
-    removed = sum(len(r.get("removed_quotes", [])) for r in results)
-    corrected = sum(q["status"] == "corrected" for q in quotes)
-    return {
-        "Most similar dispute": run.get("similar_cases", [{}])[0].get("short", "None") if run.get("similar_cases") else "None",
-        "AI calls": str(run["ai_calls"]),
-        "Facts not found in description": f"{sum(not f['verified'] for f in facts)} of {len(facts)}",
-        "Quotes kept / pinpoints corrected / removed": f"{len(quotes)} / {corrected} / {removed}",
-    }
-
-
-def show_model_comparison(runs):
-    """Compare the runs step by step. The comparison is done by code, not by the AI."""
-    st.subheader("Compare models")
-    st.caption("Rows marked ⚠️ are where the models reached different findings.")
-    header = "| | " + " | ".join(run_label(i, r) for i, r in enumerate(runs)) + " | |"
-    lines = [header, "|---" * (len(runs) + 2) + "|"]
-
-    def row(name, values):
-        flag = "⚠️ differs" if len(set(values)) > 1 else "same"
+def show_comparison(runs, index):
+    """Compare all runs of this description. The comparison is done by code, not by the AI."""
+    st.subheader("⚖️ Comparison of runs")
+    st.caption(f"You are viewing {run_label(index, runs[index])}. Rows marked ⚠️ are where the runs "
+               "reached different findings. The last rows are statistics and are not compared.")
+    rows = comparison_rows(runs)
+    lines = ["| | " + " | ".join(run_label(i, r) for i, r in enumerate(runs)) + " | |",
+             "|---" * (len(runs) + 2) + "|"]
+    for row in rows:
+        if row["kind"] == "outcome":
+            values = [OUTCOME_SHORT[v] for v in row["values"]]
+        elif row["kind"] == "step":
+            values = [BADGES[v] for v in row["values"]]
+        else:
+            values = row["values"]
+        flag = "" if row["differs"] is None else ("⚠️ differs" if row["differs"] else "same")
+        name = f"**{row['name']}**" if row["kind"] == "outcome" else row["name"]
         lines.append(f"| {name} | " + " | ".join(values) + f" | {flag} |")
-
-    row("**Outcome**", [OUTCOME_SHORT[r["outcome"]["status"]] for r in runs])
-    differing_steps = []
-    for key in STEP_ORDER:
-        values = [BADGES[r["results"][key]["conclusion"]] if key in r["results"] else BADGES["Not analysed"]
-                  for r in runs]
-        title = next(r["results"][key]["title"] for r in runs if key in r["results"]) \
-            if any(key in r["results"] for r in runs) else key
-        row(title, values)
-        if len(set(values)) > 1:
-            differing_steps.append((key, title))
-    stats = [run_stats(r) for r in runs]
-    for name in stats[0]:
-        row(name, [s[name] for s in stats])
     st.markdown("\n".join(lines))
 
-    for key, title in differing_steps:
-        with st.expander(f"Why the models differ on {title}"):
+    for row in rows:
+        if row["kind"] != "step" or not row["differs"]:
+            continue
+        with st.expander(f"Why the runs differ on {row['name']}"):
             for column, (i, run) in zip(st.columns(len(runs)), enumerate(runs)):
                 with column:
                     st.markdown(f"**{run_label(i, run)}**")
-                    if key in run["results"]:
-                        result = run["results"][key]
+                    if row["key"] in run["results"]:
+                        result = run["results"][row["key"]]
                         st.markdown(f"{BADGES[result['conclusion']]}  \n{md(result['reasoning'])}")
                     else:
                         st.caption("Not analysed in this run.")
 
 
 FINDING_COLOURS = {"Yes": "#2E7D32", "No": "#C62828", "Uncertain": "#E0A100", "Not analysed": "#9AA5B1"}
+# Red = violation found, blue = no violation / not applicable, yellow = cannot decide.
+# Blue (not green) because the tool does not take either party's side.
 OUTCOME_STYLE = {   # title, main colour, background
     "inconsistent": ("Inconsistent with Article III:4", "#C62828", "#FDECEC"),
     "not_established": ("Violation of Article III:4 not established", "#1565C0", "#E8F0FB"),
@@ -605,8 +595,6 @@ if runs:
 
     outcome = output["outcome"]
     tab_names = [TAB_OVERVIEW, TAB_STEPS, TAB_REVIEW]
-    if len(runs) > 1:
-        tab_names.append(TAB_COMPARE)
     if "tab_request" in st.session_state:          # e.g. open Overview after a new run
         st.session_state["result_tab"] = st.session_state.pop("tab_request")
     if st.session_state.get("result_tab") not in tab_names:
@@ -621,6 +609,9 @@ if runs:
     # --- Overview -----------------------------------------------------------
     with tabs[0]:
         show_verdict(outcome)
+        if output.get("revised"):
+            with st.expander("ℹ️ This run used revised facts. Show the facts used"):
+                st.text(output["measure_text"])
         if outcome["scope_warning"]:
             st.info(outcome["scope_warning"])
         if output["stopped_early"]:
@@ -657,10 +648,14 @@ if runs:
                     st.markdown(title)
                     st.caption(md(case["summary"]))
                     st.markdown(md(case["why"]))
+        if len(runs) > 1:
+            st.divider()
+            show_comparison(runs, index)
+
         st.divider()
         # Download first, then ask for feedback. Satisfied: offer the reasoning.
         # Not satisfied: the Review tab opens automatically.
-        show_downloads(index, output, None, "overview")
+        show_downloads(index, output, saved_notes(index), "overview", runs)
         satisfied = ask_if_satisfied(index)
         if satisfied == "Yes":
             st.success("Thank you. If you would like to see how the tool reached this result:")
@@ -672,9 +667,10 @@ if runs:
                 st.button("📚 See the authorities quoted", on_click=go_to_tab, args=(TAB_STEPS,),
                           use_container_width=True, key=f"jump_auth_{index}")
         elif satisfied == "No":
-            st.info("The **Review & re-run** tab has opened: change the findings yourself or run "
-                    "the analysis again with another model, then download the updated report there.")
-            st.button("✏️ Go to Review & re-run", on_click=go_to_tab, args=(TAB_REVIEW,),
+            st.info("The **Revise & re-run** tab has opened: correct or add to the facts, choose a "
+                    "model and run the analysis again. You can also add your notes and download the "
+                    "report there.")
+            st.button("✏️ Go to Revise & re-run", on_click=go_to_tab, args=(TAB_REVIEW,),
                       key=f"jump_review_{index}")
 
     # --- Step-by-step -------------------------------------------------------
@@ -686,17 +682,10 @@ if runs:
         st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
                    f"AI calls in this run: {output['ai_calls']}")
 
-    # --- Review & re-run ---------------------------------------------------
+    # --- Revise & re-run ---------------------------------------------------
     with tabs[2]:
-        st.write("Change the findings yourself, run the analysis again with another model, or "
-                 "both. Then download the report below.")
         with st.container(border=True):
-            review = show_human_review(index, output)
+            show_revise_and_rerun(index, output, runs)
         with st.container(border=True):
-            show_rerun_option(runs)
-        show_downloads(index, output, review, "review")
-
-    # --- Compare models -----------------------------------------------------
-    if len(runs) > 1:
-        with tabs[3]:
-            show_model_comparison(runs)
+            review = show_notes(index)
+        show_downloads(index, output, review, "review", runs)

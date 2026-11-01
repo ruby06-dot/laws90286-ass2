@@ -6,6 +6,54 @@ STEP_ORDER = ["scope", "physical_properties", "end_uses", "consumers", "tariff",
               "likeness", "affecting", "lft"]
 
 
+OUTCOME_TEXT = {"inconsistent": "Inconsistent", "not_established": "Not established",
+                "not_applicable": "III:4 does not apply", "uncertain": "Uncertain"}
+
+
+def run_label(index, run):
+    revised = " · revised facts" if run.get("revised") else ""
+    return f"Run {index + 1} · {run['model']}{revised}"
+
+
+def comparison_rows(runs):
+    """Rows for comparing several runs of the same matter (computed by code, not by the AI).
+
+    kind "outcome" and "step" hold raw findings; "info" rows are compared; "stat" rows are not.
+    """
+    rows = [{"name": "Outcome", "kind": "outcome", "values": [r["outcome"]["status"] for r in runs]}]
+    for key in STEP_ORDER:
+        present = [r for r in runs if key in r["results"]]
+        if not present:
+            continue
+        rows.append({"name": present[0]["results"][key]["title"], "kind": "step", "key": key,
+                     "values": [r["results"][key]["conclusion"] if key in r["results"] else "Not analysed"
+                                for r in runs]})
+    rows.append({"name": "Facts used", "kind": "info",
+                 "values": ["Revised" if r.get("revised") else "Original" for r in runs]})
+    rows.append({"name": "Most similar dispute", "kind": "info",
+                 "values": [r["similar_cases"][0]["short"] if r.get("similar_cases") else "None"
+                            for r in runs]})
+    stats = []
+    for r in runs:
+        facts = [f for res in r["results"].values() for field in ("supporting_facts", "contrary_factors")
+                 for f in res.get(field, [])]
+        quotes = [q for res in r["results"].values() for q in res.get("quotes", [])]
+        stats.append({
+            "AI calls": str(r["ai_calls"]),
+            "Facts found in the description": f"{sum(f['verified'] for f in facts)} of {len(facts)}",
+            "Quotes verified": str(len(quotes)),
+        })
+    for name in stats[0]:
+        rows.append({"name": name, "kind": "stat", "values": [st[name] for st in stats]})
+    for row in rows:
+        row["differs"] = None if row["kind"] == "stat" else len(set(row["values"])) > 1
+    return rows
+
+
+def comparison_text(row, value):
+    return OUTCOME_TEXT.get(value, value) if row["kind"] == "outcome" else value
+
+
 def bullet_list(items):
     return "\n".join(f"- {item}" for item in items) if items else "- None identified"
 
@@ -26,7 +74,7 @@ def authority_line(source):
     return f"{source['short']}: {source['citation']}" + (f" <{source['url']}>" if source["url"] else "")
 
 
-def build_markdown_report(measure_text, output, review=None):
+def build_markdown_report(measure_text, output, review=None, runs=None):
     outcome = output["outcome"]
     conclusion = output["conclusion"]
     results = output["results"]
@@ -95,23 +143,26 @@ def build_markdown_report(measure_text, output, review=None):
     lines += ["", "## Table of authorities", bullet_list(
         [authority_line(s) for s in output.get("authorities", [])])]
 
-    if review:
-        lines += ["", "## Human review"]
-        if review["changed"]:
-            lines += [f"**Outcome after review: {review['outcome']['label']}**", "",
-                      f"AI outcome before review: {outcome['label']}", "",
-                      "| Element | AI finding | After human review |", "|---|---|---|"]
-            lines.append(f"| Within Article III:4 (Step 1) | {results['scope']['conclusion']} | "
-                         f"{review['scope']} |")
-            lines += [f"| {name} | {outcome['elements'][name]} | {answer} |"
-                      for name, answer in review["elements"].items()]
-            lines.append("")
-        if review["notes"]:
-            lines += ["**Review notes**", review["notes"]]
+    if runs and len(runs) > 1:
+        lines += ["", "## Comparison of runs",
+                  "This description was analysed more than once. The table compares all runs "
+                  "(\"differs\" marks different findings; the last rows are statistics).", "",
+                  "| | " + " | ".join(run_label(i, r) for i, r in enumerate(runs)) + " | |",
+                  "|---" * (len(runs) + 2) + "|"]
+        for row in comparison_rows(runs):
+            flag = "" if row["differs"] is None else ("differs" if row["differs"] else "same")
+            lines.append(f"| {row['name']} | " + " | ".join(comparison_text(row, v) for v in row["values"])
+                         + f" | {flag} |")
+        for i, r in enumerate(runs):
+            if r.get("revised"):
+                lines += ["", f"**Facts used in {run_label(i, r)}**", r["measure_text"].strip()]
+
+    if review and review.get("notes"):
+        lines += ["", "## User notes", review["notes"]]
     return "\n".join(lines) + "\n"
 
 
-def build_docx_report(measure_text, output, review=None):
+def build_docx_report(measure_text, output, review=None, runs=None):
     """Build the same report as a Word document and return it as bytes."""
     from io import BytesIO
 
@@ -202,24 +253,27 @@ def build_docx_report(measure_text, output, review=None):
     if not output.get("authorities"):
         doc.add_paragraph("No authorities were quoted in this analysis.")
 
-    if review:
-        doc.add_heading("Human review", level=1)
-        if review["changed"]:
-            doc.add_paragraph().add_run(f"Outcome after review: {review['outcome']['label']}").bold = True
-            doc.add_paragraph(f"AI outcome before review: {outcome['label']}")
-            table = doc.add_table(rows=1, cols=3)
-            table.style = "Table Grid"
-            for cell, text in zip(table.rows[0].cells, ["Element", "AI finding", "After human review"]):
+    if runs and len(runs) > 1:
+        doc.add_heading("Comparison of runs", level=1)
+        doc.add_paragraph("This description was analysed more than once. The table compares all runs "
+                          "(\"differs\" marks different findings; the last rows are statistics).")
+        table = doc.add_table(rows=1, cols=len(runs) + 2)
+        table.style = "Table Grid"
+        for cell, text in zip(table.rows[0].cells, [""] + [run_label(i, r) for i, r in enumerate(runs)] + [""]):
+            cell.text = text
+        for row in comparison_rows(runs):
+            flag = "" if row["differs"] is None else ("differs" if row["differs"] else "same")
+            cells = table.add_row().cells
+            for cell, text in zip(cells, [row["name"]] + [comparison_text(row, v) for v in row["values"]] + [flag]):
                 cell.text = text
-            row = table.add_row().cells
-            row[0].text, row[1].text, row[2].text = ("Within Article III:4 (Step 1)",
-                                                     results["scope"]["conclusion"], review["scope"])
-            for name, answer in review["elements"].items():
-                row = table.add_row().cells
-                row[0].text, row[1].text, row[2].text = name, outcome["elements"][name], answer
-        if review["notes"]:
-            doc.add_paragraph().add_run("Review notes").bold = True
-            doc.add_paragraph(review["notes"])
+        for i, r in enumerate(runs):
+            if r.get("revised"):
+                doc.add_paragraph().add_run(f"Facts used in {run_label(i, r)}").bold = True
+                doc.add_paragraph(r["measure_text"].strip())
+
+    if review and review.get("notes"):
+        doc.add_heading("User notes", level=1)
+        doc.add_paragraph(review["notes"])
 
     buffer = BytesIO()
     doc.save(buffer)
