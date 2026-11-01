@@ -19,7 +19,8 @@ from report import (STEP_ORDER, build_docx_report, build_markdown_report, compar
 APP_PASSWORD = "12436"   # repository is private; move to Streamlit secrets before making it public
 APP_TITLE = "National Treatment Analyser"
 APP_SUBTITLE = "Step-by-step analysis under GATT 1994 Article III:4"
-TEST_CASE_DIR = Path(__file__).parent / "test_cases"
+TEST_CASE_DIR = Path(__file__).parent / "test_cases"            # the 3 official test cases
+EXTRA_CASE_DIR = Path(__file__).parent / "additional_cases"     # optional extra cases
 TAB_OVERVIEW, TAB_STEPS, TAB_REVIEW = "📋 Overview", "🔍 Step-by-step", "✏️ Revise & re-run"
 
 st.set_page_config(page_title=APP_TITLE, page_icon="⚖️", layout="wide")
@@ -173,17 +174,29 @@ for source in load_library():
         st.warning(f"knowledge file {source['id']}.txt: {problem}")
 
 
+def case_files():
+    """Dropdown label -> file. Official test cases first, then the extra ones marked (extra)."""
+    files = {}
+    for folder, prefix in [(TEST_CASE_DIR, ""), (EXTRA_CASE_DIR, "(extra) ")]:
+        if folder.exists():
+            for path in sorted(folder.glob("*.txt")):
+                files[prefix + path.name] = path
+    return files
+
+
+CASE_FILES = case_files()
+
+
 def load_test_case():
     name = st.session_state.get("selected_case")
-    if name:
-        st.session_state["measure_text"] = (TEST_CASE_DIR / name).read_text(encoding="utf-8")
+    if name in CASE_FILES:
+        st.session_state["measure_text"] = CASE_FILES[name].read_text(encoding="utf-8")
 
 
-test_cases = sorted(p.name for p in TEST_CASE_DIR.glob("*.txt")) if TEST_CASE_DIR.exists() else []
-if test_cases:
+if CASE_FILES:
     col_a, col_b = st.columns([5, 1], vertical_alignment="bottom")
     with col_a:
-        st.selectbox("Load a test case (optional)", test_cases, key="selected_case")
+        st.selectbox("Load a test case (optional)", list(CASE_FILES), key="selected_case")
     with col_b:
         st.button("Load", on_click=load_test_case)
 
@@ -412,6 +425,14 @@ def show_notes(index):
     notes = st.text_area("📝 Your notes (optional, added to the report)", key=key, height=90,
                          on_change=save, args=(key,),
                          placeholder="Your own comments on this analysis.")
+    # A text box only saves its text when the user presses Ctrl+Enter or clicks outside it.
+    # The download button is prepared before that, so show clearly whether the notes are saved.
+    if notes.strip():
+        st.markdown("<span style='color:#2E7D32; font-size:0.85rem;'>✓ Notes saved. They are "
+                    "included in the report below.</span>", unsafe_allow_html=True)
+    else:
+        st.caption("After typing, press **Ctrl+Enter** (Mac: **⌘+Enter**) or click outside the box "
+                   "to save your notes, then download.")
     return {"notes": notes.strip()} if notes.strip() else None
 
 
