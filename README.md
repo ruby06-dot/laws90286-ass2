@@ -25,7 +25,7 @@ Article III:4 requires that imported products be accorded treatment no less favo
 
 Before these elements, the measure must fall within the **scope** of Article III:4. Taxes and charges fall under Article III:2 (internal taxes) or Article II (customs duties and import charges). Import bans and quotas fall under Article XI.
 
-The tool does not analyse Article III:2, Article II or justification under Article XX. Where one of these is more likely to apply, the tool says so.
+The tool does not analyse Article III:2, Article II or justification under Article XX. Where Article III:2 or Article II is more likely to apply, Step 1 says so.
 
 ## 2. How the task is broken down
 
@@ -55,14 +55,14 @@ The AI in Step 9 explains this outcome but cannot change it.
 
 **Narrow context.** Each step receives only its own legal test, the treaty text and the user's description. The legal tests in `prompts.py` summarise the relevant WTO case law.
 
-**Structured output.** Each step returns the rule applied, supporting facts, contrary factors, evidence gaps, reasoning and a Yes, No or Uncertain finding, as JSON.
+**Structured output.** Steps 2 to 8 each return, as JSON, the rule applied, supporting facts, contrary factors, evidence gaps, quotes from the authorities, reasoning and a Yes, No or Uncertain finding. Step 1 returns the facts of the measure and a scope finding in the same way.
 
 **Two deterministic checks (looping and reflection).** After each step, ordinary code checks the AI's answer.
 
-- Every quote must appear word for word in the provision it cites. A quote found in another provision has its pinpoint corrected. A quote found nowhere is removed.
+- Every quote from the GATT text (Article III:1, III:4 and the Note Ad Article III) must appear word for word in the provision it cites. A quote found in another provision has its pinpoint corrected. A quote found nowhere is removed.
 - Every fact the AI relies on must be a passage copied word for word from the user's description. Facts that fail are marked ⚠️ and kept for the user to check.
 
-If a check fails, the failed items are sent back to the AI with an instruction to try again (up to 2 retries for quotes and 1 for facts).
+If a check fails, the failed items are sent back to the AI with an instruction to try again (up to 2 retries for quotes and 1 for facts). This loop lets the AI correct its own answer before the result is shown.
 
 **Alternative analysis.** If an earlier finding is not "Yes" (for example, like products is not established, or Step 1 finds that Article III:4 does not apply), the later steps are analysed on the assumption that it is met, and the result says so.
 
