@@ -1,19 +1,9 @@
 # US – Gasoline (Panel)
-# What this source is used for: Effective equality of opportunities for imported products.
-# HOW TO FILL IN THIS FILE
-# 1. Open the official report (link in @url, then the report PDF).
-# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
-#    Remove footnote numbers. Rejoin words split across lines by the PDF.
-# 3. Check that the paragraph number in the header matches the PDF.
-# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
-# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
-#            like (= steps 2 to 6), affecting, lft, all
-# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
-
+# Used to find similar disputes (@summary) and to cite the report (@citation, @url).
+# Verbatim excerpts of the report can be added later under headers such as
+# [137 | lft]  (paragraph number | analysis steps). Lines starting with '#' are ignored.
 
 @short: US – Gasoline (Panel)
 @citation: Panel Report, United States – Standards for Reformulated and Conventional Gasoline, WTO Doc WT/DS2/R (29 January 1996)
 @url: https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds2_e.htm
 @summary: A United States gasoline rule allowed domestic refiners to use their own individual baselines, but required most importers of foreign gasoline to use a stricter statutory baseline.
-
-[6.10 | lft]

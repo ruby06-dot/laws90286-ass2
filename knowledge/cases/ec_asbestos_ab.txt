@@ -1,40 +1,9 @@
 # EC – Asbestos (AB)
-# What this source is used for: Likeness as a competitive relationship; the four criteria; health risks; group comparison for LFT.
-# HOW TO FILL IN THIS FILE
-# 1. Open the official report (link in @url, then the report PDF).
-# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
-#    Remove footnote numbers. Rejoin words split across lines by the PDF.
-# 3. Check that the paragraph number in the header matches the PDF.
-# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
-# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
-#            like (= steps 2 to 6), affecting, lft, all
-# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
-
+# Used to find similar disputes (@summary) and to cite the report (@citation, @url).
+# Verbatim excerpts of the report can be added later under headers such as
+# [137 | lft]  (paragraph number | analysis steps). Lines starting with '#' are ignored.
 
 @short: EC – Asbestos (AB)
 @citation: Appellate Body Report, European Communities – Measures Affecting Asbestos and Asbestos-Containing Products, WTO Doc WT/DS135/AB/R (12 March 2001)
 @url: https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds135_e.htm
 @summary: France banned chrysotile asbestos and products containing it, while substitute fibres (PCG fibres) and products containing them remained on sale; Canada challenged the ban.
-
-[99 | like]
-
-
-[100 | lft]
-
-
-[101 | like]
-
-
-[102 | like]
-
-
-[103 | like]
-
-
-[113 | physical]
-
-
-[114 | physical, consumers]
-
-
-[122 | consumers]

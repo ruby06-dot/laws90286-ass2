@@ -160,12 +160,16 @@ with st.expander("How the analysis works"):
         "5. **Conclusion.** The outcome is decided by fixed rules: a violation is established "
         "only if all three elements are met. The AI then explains the outcome.\n\n"
         "**Two checks by ordinary code (no AI):**\n"
-        "- Every quote from a WTO report or the GATT must appear word-for-word in the paragraph "
-        "it cites. A quote found in a different paragraph has its pinpoint corrected; a quote "
-        "found nowhere is removed.\n"
+        "- Every quote must appear word-for-word in the provision it cites. The knowledge base "
+        "currently holds the text of GATT Article III:1, III:4 and the Note Ad Article III. A "
+        "quote found in a different provision has its pinpoint corrected; a quote found nowhere "
+        "is removed.\n"
         "- Every fact the AI relies on must appear word-for-word in your description. Facts that "
         "fail are marked ⚠️ for you to check.\n\n"
-        "Failed checks are first sent back to the AI for another attempt."
+        "Failed checks are first sent back to the AI for another attempt.\n\n"
+        "The WTO case law behind each legal test is summarised in the tool's instructions to the "
+        "AI. The reports themselves are not stored, so the AI cannot quote them; the most similar "
+        "disputes are linked to their WTO pages so that you can read the reports."
     )
 
 # Warn about formatting problems in the knowledge files (shown only if there are any).

@@ -1,31 +1,9 @@
 # China – Auto Parts (AB)
-# What this source is used for: Distinguishing internal charges (Article III) from border charges (Article II): what matters is when and why the obligation to pay arises. Check the paragraph numbers.
-# HOW TO FILL IN THIS FILE
-# 1. Open the official report (link in @url, then the report PDF).
-# 2. Under each [paragraph | steps] header, paste that paragraph WORD FOR WORD.
-#    Remove footnote numbers. Rejoin words split across lines by the PDF.
-# 3. Check that the paragraph number in the header matches the PDF.
-# 4. Headers with no text under them are ignored, so unfinished slots do no harm.
-# Step tags: scope, physical, end_uses, consumers, tariff, likeness,
-#            like (= steps 2 to 6), affecting, lft, all
-# The suggested paragraph numbers below have NOT been checked. Change or delete them as needed.
-
+# Used to find similar disputes (@summary) and to cite the report (@citation, @url).
+# Verbatim excerpts of the report can be added later under headers such as
+# [137 | lft]  (paragraph number | analysis steps). Lines starting with '#' are ignored.
 
 @short: China – Auto Parts (AB)
 @citation: Appellate Body Report, China – Measures Affecting Imports of Automobile Parts, WTO Doc WT/DS339/AB/R, WT/DS340/AB/R, WT/DS342/AB/R (15 December 2008)
 @url: https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds339_e.htm
 @summary: China imposed a charge, equal to the tariff on complete vehicles, on imported auto parts when they were used to assemble vehicles with more than a set level of imported parts.
-
-[158 | scope]
-
-
-[161 | scope]
-
-
-[162 | scope]
-
-
-[163 | scope]
-
-
-[171 | scope]

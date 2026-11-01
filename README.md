@@ -1,0 +1,201 @@
+# National Treatment Analyser
+
+LAWS90286 Legal AI, Assignment 2.
+
+A Streamlit application that analyses, step by step, whether a government measure is inconsistent with the national treatment obligation in Article III:4 of the GATT 1994.
+
+| | |
+|---|---|
+| Deployed application | https://YOUR-APP-NAME.streamlit.app *(to be replaced with the deployed URL)* |
+| Password | Provided with the submission |
+| API key | Enter your own OpenAI API key in the sidebar and click "Update API Key" |
+| Recommended model | `gpt-4o` (the test cases were checked with this model) |
+
+This tool does not provide legal advice.
+
+---
+
+## 1. The legal task
+
+Article III:4 requires that imported products be accorded treatment no less favourable than that accorded to like domestic products in respect of all laws, regulations and requirements affecting their internal sale, offering for sale, purchase, transportation, distribution or use. A violation is established only if three elements are met.
+
+1. The imported and domestic products are **like products**.
+2. The measure is a **law, regulation or requirement affecting** their internal sale or use.
+3. The imported products are accorded **less favourable treatment**.
+
+Before these elements, the measure must fall within the **scope** of Article III:4. Taxes and charges fall under Article III:2 (internal taxes) or Article II (customs duties and import charges). Import bans and quotas fall under Article XI.
+
+The tool does not analyse Article III:2, Article II or justification under Article XX. Where one of these is more likely to apply, the tool says so.
+
+## 2. How the task is broken down
+
+| Step | Sub-process | AI calls |
+|---|---|---|
+| 1 | Extract the facts and decide whether the measure is within the scope of Article III:4 | 1 |
+| 2 to 5 | Like products, one criterion per step (physical properties, end-uses, consumers' tastes and habits, tariff classification) | 4 |
+| 6 | Like products, overall finding | 1 |
+| 7 | Law, regulation or requirement "affecting" internal sale etc. | 1 |
+| 8 | Less favourable treatment | 1 |
+| 9 | Conclusion, similar WTO disputes, key uncertainties and next steps | 1 |
+
+A full run makes **9 AI calls**. More calls are made when a check fails and the step is retried (see section 3). If the user unticks "continue the analysis in the alternative" and the products are found not to be like, the run stops after Step 6 and makes 7 AI calls.
+
+## 3. Design
+
+**Control flow and outcome in Python.** Python, not the AI, sets the order of the steps, decides whether to stop early and fixes the outcome by boolean rules.
+
+| Findings | Outcome |
+|---|---|
+| Step 1 is "No" | Article III:4 does not apply. The element findings are given in the alternative only |
+| Any element is "No" | Violation not established |
+| All three elements are "Yes" | Inconsistent with Article III:4 |
+| Otherwise | Uncertain |
+
+The AI in Step 9 explains this outcome but cannot change it.
+
+**Narrow context.** Each step receives only its own legal test, the treaty text and the user's description. The legal tests in `prompts.py` summarise the relevant WTO case law.
+
+**Structured output.** Each step returns the rule applied, supporting facts, contrary factors, evidence gaps, reasoning and a Yes, No or Uncertain finding, as JSON.
+
+**Two deterministic checks (looping and reflection).** After each step, ordinary code checks the AI's answer.
+
+- Every quote must appear word for word in the provision it cites. A quote found in another provision has its pinpoint corrected. A quote found nowhere is removed.
+- Every fact the AI relies on must be a passage copied word for word from the user's description. Facts that fail are marked ⚠️ and kept for the user to check.
+
+If a check fails, the failed items are sent back to the AI with an instruction to try again (up to 2 retries for quotes and 1 for facts).
+
+**Alternative analysis.** If an earlier finding is not "Yes" (for example, like products is not established, or Step 1 finds that Article III:4 does not apply), the later steps are analysed on the assumption that it is met, and the result says so.
+
+**Human in the loop.** After each run the user is asked whether they are satisfied. If not, the "Revise & re-run" tab lets the user correct or add to the facts, choose another model and run the analysis again. All runs of the same description are compared step by step in a table. The comparison is made by code, not by the AI.
+
+**Output.** The result page shows the outcome, a diagram of the steps, a summary, key uncertainties, next steps, the most similar WTO disputes (with links to the WTO pages), the reasoning for each step and a table of authorities. The report can be downloaded as a Word (.docx) or Markdown (.md) file. It includes the comparison of runs and the user's notes where these exist.
+
+## 4. Test cases
+
+The three test cases are in `test_cases/`. Select one from the "Load a test case" menu and click **Load**, or upload the `.txt` file with the **Upload** button. Then click **Run analysis**.
+
+### Test case 1. Separate retail channels for imported beef
+
+File `test_cases/case_1_separate_retail.txt`
+
+Westland allows imported beef to be sold only in specialist stores, while domestic beef may be sold anywhere. The facts are modelled on *Korea – Beef*.
+
+| Step | Expected |
+|---|---|
+| 1 Scope | Yes (internal regulation on retail sale) |
+| 2 to 6 Like products | Yes |
+| 7 Affecting | Yes |
+| 8 Less favourable treatment | Yes (conditions of competition modified to the detriment of imported beef) |
+| **Outcome** | 🔴 **Inconsistent with Article III:4** |
+| Most similar dispute | *Korea – Beef* |
+
+Observed with gpt-4o. The expected outcome, with *Korea – Beef* as the most similar dispute. This case shows the tool working well on a clear case of origin-based differential treatment.
+
+### Test case 2. An import charge collected inside the country
+
+File `test_cases/case_2_deferred_import_charge.txt`
+
+Northvale charges 12 per cent on imported scooters. The obligation to pay arises at customs clearance, but the charge is collected 60 days later by the domestic revenue agency. Northvale calls it an internal tax. The bound tariff rate is 5 per cent.
+
+| Step | Expected |
+|---|---|
+| 1 Scope | **No** (a border charge under Article II, because the obligation arises at importation) |
+| 7 and 8 | Analysed in the alternative only |
+| **Outcome** | 🔵 **Article III:4 does not apply** |
+| Most similar dispute | *China – Auto Parts* |
+
+Observed with gpt-4o. The expected outcome. The summary and next steps point to Article II and the 5 per cent bound rate.
+
+This case shows where the tool performed poorly and how it was improved. In the first version, Step 1 classified the charge as an internal tax, the summary misstated when the charge is collected, and Step 8 answered "No" because it carried the scope finding into the analysis of less favourable treatment. The scope test was then revised to ask when and why the obligation to pay arises (*China – Auto Parts*), a "does not apply" outcome was added, and Step 8 now states the assumptions of the alternative analysis.
+
+### Test case 3. Incomplete facts, then revise and re-run
+
+File `test_cases/case_3_honey_revise_and_rerun.txt`
+
+Southvale requires a purity certificate for imported honey. The description deliberately leaves out key facts. This case has two parts.
+
+**Part A. First run.** Load and run the case.
+
+| | Expected |
+|---|---|
+| Like products | Uncertain (no facts about the products) |
+| **Outcome** | 🟡 **Uncertain** |
+
+**Part B. Revise and re-run.** Answer **No** to "Are you satisfied with this analysis?". The "Revise & re-run" tab opens. Paste the text below into **Points to emphasise or clarify** and click **Run the analysis again**.
+
+```
+Domestic honey does not need a purity certificate. Each certificate costs 600 Southvale dollars per batch. Only two laboratories are approved, both in Southvale, and the waiting time for a certificate is about six weeks. Imported and domestic honey are physically the same product, are used in the same ways, are sold side by side on supermarket shelves at similar prices, and fall under the same tariff heading (0409).
+```
+
+| | Expected |
+|---|---|
+| Like products, affecting, less favourable treatment | Yes |
+| **Outcome** | 🔴 **Inconsistent with Article III:4** |
+| Comparison of runs | Steps 2 to 6 and the outcome marked "differs". "Facts used" shows Original and Revised |
+
+Observed with gpt-4o. Part A gave Uncertain and Part B gave Inconsistent, as expected. The case shows that the tool does not fill gaps with invented facts, and that a user can supply the missing facts and see their effect.
+
+It also shows a limitation. In two runs of Part A with the same model and the same facts, Step 8 was answered "Yes" once and "Uncertain" once. A temperature of 0 does not make the model fully deterministic.
+
+### Additional case (optional)
+
+File `additional_cases/extra_uncertain_recycled_bottles.txt`, shown in the menu as "(extra)".
+
+An origin-neutral packaging rule with no evidence of its effect on imported products. Expected outcome 🟡 **Uncertain**, with less favourable treatment uncertain. Observed with gpt-4o as expected.
+
+## 5. Artefacts for the tests
+
+All test descriptions are plain text files in `test_cases/` and `additional_cases/`. They can be loaded from the menu or uploaded with the Upload button. The text to paste in test case 3, Part B, is set out above. No other files are needed.
+
+## 6. API credentials module
+
+`credentials.py` is based on the course module at https://github.com/stoneman-mls/openai_credentials. The changes are as follows.
+
+- The key is entered in a masked field and is not displayed on the page.
+- The session state is set up inside the function, so that it works for every user session.
+- After the key is saved, the app lists the chat models that the key can use (this does not use tokens) and the user can choose one. `gpt-4o` is the default.
+- A "Remove API key (log out)" button clears the key.
+
+No API key is stored in this repository.
+
+## 7. Limitations
+
+- **Case law is summarised, not quoted.** The legal tests summarise WTO case law in the prompts. The reports are not stored, so the quote check applies to the GATT text only. Covering all WTO reports would need a retrieval (RAG) pipeline over the full reports, which would add retrieval errors. The code already supports report excerpts (`knowledge/cases/`, pinpoint checking and the table of authorities), so these can be added later.
+- **The checks test sources, not reasoning.** The fact check confirms that a fact appears in the user's text. It cannot confirm that the AI used the fact correctly. It is also strict, so a quote that drops a few words is flagged even when its meaning is unchanged.
+- **Model and run variation.** Different models, and sometimes repeated runs of the same model, reach different findings on borderline steps. The comparison table makes this visible.
+- **Cautious findings.** Step 2 (physical properties) is sometimes "Uncertain" even when the products are plainly identical. The most similar disputes are sometimes only loosely related.
+- **Scope of the tool.** The tool does not analyse Article III:2, Article II or Article XX.
+
+## 8. Key authorities
+
+- Appellate Body Report, *Korea – Measures Affecting Imports of Fresh, Chilled and Frozen Beef*, WTO Doc WT/DS161/AB/R, WT/DS169/AB/R (11 December 2000)
+- Appellate Body Report, *European Communities – Measures Affecting Asbestos and Asbestos-Containing Products*, WTO Doc WT/DS135/AB/R (12 March 2001)
+- Appellate Body Report, *China – Measures Affecting Imports of Automobile Parts*, WTO Doc WT/DS339/AB/R, WT/DS340/AB/R, WT/DS342/AB/R (15 December 2008)
+- Appellate Body Report, *Thailand – Customs and Fiscal Measures on Cigarettes from the Philippines*, WTO Doc WT/DS371/AB/R (17 June 2011)
+- Appellate Body Report, *European Communities – Measures Prohibiting the Importation and Marketing of Seal Products*, WTO Doc WT/DS400/AB/R, WT/DS401/AB/R (22 May 2014)
+
+The full list of disputes used to find similar cases is in `knowledge/cases/`.
+
+## 9. Running locally
+
+```bash
+pip install -r requirements.txt
+streamlit run home.py
+```
+
+## 10. Repository structure
+
+```
+home.py              Streamlit interface, password gate, results, revise and re-run, comparison
+analysis.py          Step-by-step pipeline, control flow, retries and outcome rules
+prompts.py           Legal tests and prompt templates for each step
+authorities.py       Knowledge files, quote and fact checks, similar disputes
+report.py            Word and Markdown reports
+credentials.py       API credentials sidebar (based on the course module)
+knowledge/treaty/    Text of GATT Article III:1, III:4 and the Note Ad Article III
+knowledge/cases/     WTO disputes (citation, link and a one-line summary of the facts)
+test_cases/          The three test cases
+additional_cases/    The optional additional case
+.streamlit/          Theme settings
+requirements.txt     Python packages
+```
