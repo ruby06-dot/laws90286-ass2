@@ -304,7 +304,10 @@ def build_conclusion_prompt(measure_text, outcome, all_results_json, dispute_lis
         "(for example, when, where or by whom something is done).",
         "If the OUTCOME says that Article III:4 does not apply, explain why, based on Step 1, and "
         "name the provision that is more likely to apply (for example Article II or Article III:2). "
-        "Describe the findings on the three elements as made in the alternative only.",
+        "Describe the findings on the three elements as made in the alternative only. In that "
+        "case, key_uncertainties and next_steps should focus on the characterisation of the "
+        "measure and on the provision that is more likely to apply (for example, whether a charge "
+        "exceeds a bound tariff rate under Article II), not on the alternative element findings.",
         "If like products was not answered Yes, describe any findings on the other elements as "
         "made in the alternative (that is, on the assumption that the products are like products), "
         "not as settled findings.",

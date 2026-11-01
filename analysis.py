@@ -263,8 +263,24 @@ class Article3_4Analysis:
                  "affecting": results["affecting"]["reasoning"]},
                 indent=2,
             )
-            if alternative_note:
-                earlier = alternative_note + "\n\n" + earlier
+            # Step 8 asks only about less favourable treatment. If an earlier step was not
+            # answered Yes, it is analysed on the assumption that those steps are met.
+            assumptions = []
+            if results["scope"]["conclusion"] != "Yes":
+                assumptions.append("that Article III:4 applies to the measure "
+                                   f"(Step 1 found: {results['scope']['conclusion']})")
+            if results["likeness"]["conclusion"] != "Yes":
+                assumptions.append("that the products are like products "
+                                   f"(Step 6 found: {results['likeness']['conclusion']})")
+            if results["affecting"]["conclusion"] != "Yes":
+                assumptions.append("that the measure is a law, regulation or requirement affecting "
+                                   f"internal sale etc. (Step 7 found: {results['affecting']['conclusion']})")
+            if assumptions:
+                earlier = ("NOTE: Analyse this step in the alternative, on the assumption "
+                           + " and ".join(assumptions) + ". Say so at the start of your reasoning. "
+                           "Decide only whether imported products are treated less favourably than "
+                           "like domestic products; do not answer No merely because an earlier "
+                           "step was not met.\n\n" + earlier)
             report(STEPS["lft"]["title"])
             results["lft"] = self.run_step("lft", measure_text, facts_json, earlier)
 

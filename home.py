@@ -4,6 +4,8 @@ Run locally with:  streamlit run home.py
 """
 
 import hmac
+import time
+from html import escape
 from pathlib import Path
 
 import streamlit as st
@@ -17,8 +19,66 @@ APP_PASSWORD = "12436"   # repository is private; move to Streamlit secrets befo
 APP_TITLE = "National Treatment Analyser"
 APP_SUBTITLE = "Step-by-step analysis under GATT 1994 Article III:4"
 TEST_CASE_DIR = Path(__file__).parent / "test_cases"
+TAB_OVERVIEW, TAB_STEPS, TAB_REVIEW, TAB_COMPARE = (
+    "📋 Overview", "🔍 Step-by-step", "✏️ Review & re-run", "⚖️ Compare models")
 
 st.set_page_config(page_title=APP_TITLE, page_icon="⚖️", layout="wide")
+
+# ---------------------------------------------------------------------------
+# Styles (header banner, verdict card, step flow diagram)
+# ---------------------------------------------------------------------------
+
+st.markdown("""
+<style>
+.nt-banner {background: #F4F7FB; border: 1px solid #DCE4EE; border-left: 6px solid #1F3A5F;
+  padding: 0.9rem 1.3rem 0.75rem; border-radius: 12px; margin: 0 0 1rem;}
+.nt-banner .nt-title {font-size: 1.6rem; font-weight: 700; line-height: 1.2; color: #1F3A5F;}
+.nt-banner .nt-sub {color: #5A6675; font-size: 0.95rem; margin: 0.2rem 0 0.55rem;}
+.nt-chip {display: inline-block; background: #FFFFFF; border: 1px solid #C9D4E2; border-radius: 999px;
+  padding: 0.08rem 0.6rem; margin: 0.15rem 0.3rem 0.15rem 0; font-size: 0.78rem; color: #1F3A5F;
+  white-space: nowrap;}
+.nt-login {text-align: center; border-left: 1px solid #DCE4EE; border-top: 5px solid #1F3A5F;}
+.nt-login .nt-title {font-size: 1.7rem;}
+.nt-elements {display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.2rem 0 0.4rem;}
+.nt-el {border: 1px solid #D9E0E8; border-radius: 8px; padding: 0.3rem 0.7rem; font-size: 0.88rem;
+  background: #FAFBFD;}
+.nt-el b {margin-left: 0.35rem;}
+.nt-stats {font-size: 0.78rem; color: #7A8594; margin: 0.1rem 0 1rem;}
+.nt-stats span {margin-right: 1.1rem; white-space: nowrap;}
+.nt-verdict {border-radius: 14px; padding: 1.1rem 1.4rem; margin: 0.4rem 0 1rem;
+  border-left: 8px solid var(--nt-c); background: var(--nt-bg);}
+.nt-verdict .nt-v-title {font-size: 1.45rem; font-weight: 700; color: var(--nt-c);}
+.nt-verdict .nt-v-text {margin-top: 0.3rem; color: #333;}
+.nt-flow {display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.6rem 0 0.2rem;}
+.nt-node {display: flex; flex-direction: column; align-items: center; min-width: 74px;}
+.nt-dot {width: 40px; height: 40px; border-radius: 50%; color: #FFFFFF; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; font-size: 1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);}
+.nt-lbl {font-size: 0.78rem; margin-top: 0.3rem; text-align: center; line-height: 1.15;}
+.nt-arrow {color: #9AA5B1; font-size: 1.2rem; margin-bottom: 1.1rem;}
+.nt-group {border: 1.5px dashed #9AA5B1; border-radius: 12px; padding: 0.35rem 0.4rem 0.2rem;}
+.nt-group-title {font-size: 0.72rem; color: #6B7785; text-align: center; margin-bottom: 0.2rem;}
+.nt-group-row {display: flex; gap: 0.2rem;}
+.nt-outcome {border-radius: 999px; padding: 0.45rem 1rem; color: #FFFFFF; font-weight: 700;
+  font-size: 0.9rem; margin-bottom: 1.1rem;}
+.nt-legend {font-size: 0.78rem; color: #6B7785; margin-bottom: 0.6rem;}
+.nt-legend span {display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin: 0 0.25rem 0 0.7rem; vertical-align: middle;}
+</style>
+""", unsafe_allow_html=True)
+
+
+def banner(chips=True, login=False):
+    """The navy header banner shown on the login page and the main page."""
+    chip_html = ""
+    if chips:
+        chip_html = "<div>" + "".join(f"<span class='nt-chip'>{c}</span>" for c in [
+            "⚖️ GATT 1994 Art III:4", "🧭 9 guided steps", "🧮 Outcome decided by fixed rules",
+            "🔎 Quotes and facts checked by code", "✏️ Human review", "🔁 Model comparison",
+        ]) + "</div>"
+    extra = " nt-login" if login else ""
+    st.markdown(f"<div class='nt-banner{extra}'><div class='nt-title'>⚖️ {APP_TITLE}</div>"
+                f"<div class='nt-sub'>{APP_SUBTITLE}</div>{chip_html}</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -34,9 +94,7 @@ def password_ok():
     with middle:
         st.write("")
         st.write("")
-        st.markdown(f"<h1 style='text-align: center; font-size: 1.85rem;'>⚖️ {APP_TITLE}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; color: grey;'>{APP_SUBTITLE}</p>",
-                    unsafe_allow_html=True)
+        banner(chips=False, login=True)
         # Centre the Enter button inside the login form.
         st.markdown(
             "<style>"
@@ -78,8 +136,7 @@ model = select_model(client)
 # Input
 # ---------------------------------------------------------------------------
 
-st.title(f"⚖️ {APP_TITLE}")
-st.caption(APP_SUBTITLE)
+banner()
 st.write(
     "Describe the measure at issue and the relevant facts. The tool analyses, step by step, whether it is "
     "inconsistent with the national treatment obligation in Article III:4 of the GATT 1994 "
@@ -169,6 +226,7 @@ run_clicked = st.button("Run analysis", type="primary")
 def run_analysis(text, chosen_model, continue_alt):
     """Run the analysis with a progress box. Returns the output, or None on error."""
     analysis = Article3_4Analysis(client, model=chosen_model)
+    started = time.perf_counter()
     with st.status(f"Running analysis with {chosen_model}...", expanded=True) as status:
         try:
             output = analysis.run(text, continue_in_alternative=continue_alt,
@@ -181,6 +239,7 @@ def run_analysis(text, chosen_model, continue_alt):
                       state="complete", expanded=False)
     output["measure_text"] = text
     output["continue_in_alternative"] = continue_alt
+    output["seconds"] = round(time.perf_counter() - started)
     return output
 
 
@@ -198,6 +257,7 @@ if run_clicked:
                                               "saved_widgets"))]:
                 del st.session_state[key]
             st.session_state["runs"] = [new_output]
+            st.session_state["tab_request"] = TAB_OVERVIEW
 
 
 # ---------------------------------------------------------------------------
@@ -205,8 +265,6 @@ if run_clicked:
 # ---------------------------------------------------------------------------
 
 BADGES = {"Yes": "🟢 Yes", "No": "🔴 No", "Uncertain": "🟡 Uncertain", "Not analysed": "⚪ Not analysed"}
-# The element cards use ticks and crosses, so colour is used only for the overall outcome.
-CARD_MARKS = {"Yes": "✔️ Yes", "No": "✖️ No", "Uncertain": "❓ Uncertain", "Not analysed": "– Not analysed"}
 OUTCOME_SHORT = {"inconsistent": "🔴 Inconsistent", "not_established": "🔵 Not established",
                  "not_applicable": "🔵 III:4 does not apply",
                  "uncertain": "🟡 Uncertain"}
@@ -333,7 +391,7 @@ def ask_if_satisfied(index):
     st.subheader("Are you satisfied with this analysis?")
     key = remember(f"satisfied_{index}", None)
     return st.radio("Are you satisfied with this analysis?", ["Yes", "No"], horizontal=True,
-                    key=key, on_change=save, args=(key,), label_visibility="collapsed")
+                    key=key, on_change=satisfied_changed, args=(key,), label_visibility="collapsed")
 
 
 def show_rerun_option(runs):
@@ -360,28 +418,32 @@ def show_rerun_option(runs):
         if new_output:
             runs.append(new_output)
             st.session_state["show_run_request"] = len(runs) - 1
+            st.session_state["tab_request"] = TAB_COMPARE
             st.rerun()
 
 
-def show_downloads(index, output, review):
-    st.subheader("Download")
-    col_word, col_md, _ = st.columns([1, 1, 2])
-    with col_word:
-        st.download_button(
-            "Download report (Word)",
-            data=build_docx_report(output["measure_text"], output, review),
-            file_name="article_III_4_analysis.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-    with col_md:
-        st.download_button(
-            "Download report (Markdown)",
-            data=build_markdown_report(output["measure_text"], output, review),
-            file_name="article_III_4_analysis.md",
-            mime="text/markdown",
-        )
-    note = " and your review" if review else ""
-    st.caption(f"The report covers the run shown above ({run_label(index, output)}){note}.")
+def show_downloads(index, output, review, where):
+    with st.container(border=True):
+        st.markdown("#### 📥 Download the report")
+        note = " and your review" if review else ""
+        st.caption(f"The report covers {run_label(index, output)}{note}: the outcome, every step, "
+                   "the facts and quotes with their check results, and the table of authorities.")
+        col_word, col_md, _ = st.columns([1, 1, 1])
+        with col_word:
+            st.download_button(
+                "⬇️ Word report (.docx)", type="primary", use_container_width=True,
+                data=build_docx_report(output["measure_text"], output, review),
+                file_name="article_III_4_analysis.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=f"docx_{where}_{index}",
+            )
+        with col_md:
+            st.download_button(
+                "⬇️ Markdown report (.md)", use_container_width=True,
+                data=build_markdown_report(output["measure_text"], output, review),
+                file_name="article_III_4_analysis.md", mime="text/markdown",
+                key=f"md_{where}_{index}",
+            )
 
 
 def run_stats(run):
@@ -436,6 +498,93 @@ def show_model_comparison(runs):
                         st.caption("Not analysed in this run.")
 
 
+FINDING_COLOURS = {"Yes": "#2E7D32", "No": "#C62828", "Uncertain": "#E0A100", "Not analysed": "#9AA5B1"}
+OUTCOME_STYLE = {   # title, main colour, background
+    "inconsistent": ("Inconsistent with Article III:4", "#C62828", "#FDECEC"),
+    "not_established": ("Violation of Article III:4 not established", "#1565C0", "#E8F0FB"),
+    "not_applicable": ("Article III:4 does not apply", "#1565C0", "#E8F0FB"),
+    "uncertain": ("Uncertain", "#B7791F", "#FFF6E0"),
+}
+FLOW_LABELS = {"scope": "Scope", "physical_properties": "Physical", "end_uses": "End-uses",
+               "consumers": "Consumers", "tariff": "Tariff", "likeness": "Like products",
+               "affecting": "Affecting", "lft": "Less favourable"}
+
+
+def show_verdict(outcome):
+    title, colour, background = OUTCOME_STYLE[outcome["status"]]
+    st.markdown(f"<div class='nt-verdict' style='--nt-c: {colour}; --nt-bg: {background};'>"
+                f"<div class='nt-v-title'>{escape(title)}</div>"
+                f"<div class='nt-v-text'>{escape(outcome['label'])}</div></div>", unsafe_allow_html=True)
+
+
+def show_step_flow(output):
+    """A pipeline diagram of the steps, each coloured by its finding."""
+    results = output["results"]
+
+    def node(key, number):
+        answer = results[key]["conclusion"] if key in results else "Not analysed"
+        return (f"<div class='nt-node' title='{escape(FLOW_LABELS[key])}: {answer}'>"
+                f"<div class='nt-dot' style='background: {FINDING_COLOURS[answer]};'>{number}</div>"
+                f"<div class='nt-lbl'>{FLOW_LABELS[key]}<br>{answer}</div></div>")
+
+    arrow = "<div class='nt-arrow'>➜</div>"
+    criteria = "".join(node(key, n) for n, key in
+                       enumerate(["physical_properties", "end_uses", "consumers", "tariff"], start=2))
+    _, colour, _ = OUTCOME_STYLE[output["outcome"]["status"]]
+    title = OUTCOME_STYLE[output["outcome"]["status"]][0]
+    parts = [node("scope", 1), arrow,
+             f"<div class='nt-group'><div class='nt-group-title'>Like products criteria</div>"
+             f"<div class='nt-group-row'>{criteria}</div></div>", arrow,
+             node("likeness", 6), arrow, node("affecting", 7), arrow, node("lft", 8), arrow,
+             f"<div class='nt-outcome' style='background: {colour};'>{escape(title)}</div>"]
+    legend = "".join(f"<span style='background: {c};'></span>{a}" for a, c in FINDING_COLOURS.items())
+    st.markdown(f"<div class='nt-flow'>{''.join(parts)}</div>"
+                f"<div class='nt-legend'>{legend}</div>", unsafe_allow_html=True)
+
+
+def show_elements_and_stats(output):
+    """Compact element findings, then a small grey line of run statistics."""
+    marks = {"Yes": "✔ Yes", "No": "✖ No", "Uncertain": "? Uncertain", "Not analysed": "– Not analysed"}
+    boxes = "".join(f"<div class='nt-el'>{escape(name)}<b>{marks.get(answer, answer)}</b></div>"
+                    for name, answer in output["outcome"]["elements"].items())
+    results = output["results"].values()
+    facts = [f for r in results for field in ("supporting_facts", "contrary_factors") for f in r.get(field, [])]
+    quotes = [q for r in results for q in r.get("quotes", [])]
+    seconds = output.get("seconds")
+    stats = [f"Model {escape(output['model'])}", f"AI calls {output['ai_calls']}",
+             f"Facts found in your text {sum(f['verified'] for f in facts)}/{len(facts)}",
+             f"Quotes verified {len(quotes)}"]
+    if seconds is not None:
+        stats.append(f"Time {seconds} s")
+    st.markdown(f"<div class='nt-elements'>{boxes}</div><div class='nt-stats'>"
+                + "".join(f"<span>{x}</span>" for x in stats) + "</div>", unsafe_allow_html=True)
+
+
+def go_to_tab(name):
+    """Button callback: switch the result tab and scroll back up to the tabs."""
+    st.session_state["result_tab"] = name
+    st.session_state["scroll_to_tabs"] = True
+
+
+def satisfied_changed(key):
+    save(key)
+    if st.session_state[key] == "No":
+        go_to_tab(TAB_REVIEW)
+
+
+def scroll_to_tabs_if_needed():
+    """After a jump button is used, scroll the page back up to the tabs."""
+    if not st.session_state.pop("scroll_to_tabs", False):
+        return
+    script = ("<script>const t = window.parent.document.querySelector('[data-baseweb=\"tab-list\"]');"
+              "if (t) {t.scrollIntoView({behavior: 'smooth', block: 'start'});}</script>")
+    if hasattr(st, "iframe"):          # newer Streamlit
+        st.iframe(script, height=1)
+    else:                              # older Streamlit
+        import streamlit.components.v1 as components
+        components.html(script, height=0)
+
+
 # ---------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------
@@ -455,70 +604,99 @@ if runs:
     output = runs[index]
 
     outcome = output["outcome"]
-    OUTCOME_BOX[outcome["status"]](outcome["label"])
-    if outcome["scope_warning"]:
-        st.info(outcome["scope_warning"])
-    if output["stopped_early"]:
-        st.caption("Analysis stopped after the like products step, as selected.")
-    if output.get("in_alternative"):
-        st.info("Like products was not established. Steps 7 and 8 were analysed in the "
-                "alternative, on the assumption that the products are like products.")
+    tab_names = [TAB_OVERVIEW, TAB_STEPS, TAB_REVIEW]
+    if len(runs) > 1:
+        tab_names.append(TAB_COMPARE)
+    if "tab_request" in st.session_state:          # e.g. open Overview after a new run
+        st.session_state["result_tab"] = st.session_state.pop("tab_request")
+    if st.session_state.get("result_tab") not in tab_names:
+        st.session_state["result_tab"] = tab_names[0]
+    try:
+        # Remember the selected tab when a button or box inside it is used.
+        tabs = st.tabs(tab_names, key="result_tab", on_change="rerun")
+    except TypeError:   # older Streamlit without stateful tabs
+        tabs = st.tabs(tab_names)
+    scroll_to_tabs_if_needed()
 
-    element_columns = st.columns(len(outcome["elements"]))
-    for column, (name, answer) in zip(element_columns, outcome["elements"].items()):
-        with column:
+    # --- Overview -----------------------------------------------------------
+    with tabs[0]:
+        show_verdict(outcome)
+        if outcome["scope_warning"]:
+            st.info(outcome["scope_warning"])
+        if output["stopped_early"]:
+            st.caption("Analysis stopped after the like products step, as selected.")
+        if output.get("in_alternative"):
+            st.info("Like products was not established. Steps 7 and 8 were analysed in the "
+                    "alternative, on the assumption that the products are like products.")
+
+        show_step_flow(output)
+
+        show_elements_and_stats(output)
+
+        conclusion = output["conclusion"]
+        st.subheader("Summary")
+        st.write(md(conclusion.get("executive_summary", "")))
+        col1, col2 = st.columns(2)
+        with col1:
             with st.container(border=True):
-                st.caption(name)
-                st.markdown(f"**{CARD_MARKS.get(answer, answer)}**")
-
-    conclusion = output["conclusion"]
-    st.subheader("Summary")
-    st.write(md(conclusion.get("executive_summary", "")))
-    col1, col2 = st.columns(2)
-    with col1:
-        with st.container(border=True):
-            show_list("⚠️ Key uncertainties", conclusion.get("key_uncertainties", []))
-    with col2:
-        with st.container(border=True):
-            show_list("➡️ Next steps", conclusion.get("next_steps", []))
-
-    similar = output.get("similar_cases", [])
-    if similar:
-        st.subheader("Most similar WTO disputes")
-        st.caption("Chosen by the AI by comparing your facts with short summaries of the disputes "
-                   "in the knowledge base. Read the reports before relying on the comparison.")
-        for case in similar:
+                show_list("⚠️ Key uncertainties", conclusion.get("key_uncertainties", []))
+        with col2:
             with st.container(border=True):
-                title = f"**{case['short']}**"
-                if case["url"]:
-                    title += f" ([WTO page]({case['url']}))"
-                st.markdown(title)
-                st.caption(md(case["summary"]))
-                st.markdown(md(case["why"]))
+                show_list("➡️ Next steps", conclusion.get("next_steps", []))
 
-    st.subheader("Step-by-step analysis")
-    for key in STEP_ORDER:
-        if key in output["results"]:
-            show_step(output["results"][key])
+        similar = output.get("similar_cases", [])
+        if similar:
+            st.subheader("Most similar WTO disputes")
+            st.caption("Chosen by the AI by comparing your facts with short summaries of the disputes "
+                       "in the knowledge base. Read the reports before relying on the comparison.")
+            for case in similar:
+                with st.container(border=True):
+                    title = f"**{case['short']}**"
+                    if case["url"]:
+                        title += f" ([WTO page]({case['url']}))"
+                    st.markdown(title)
+                    st.caption(md(case["summary"]))
+                    st.markdown(md(case["why"]))
+        st.divider()
+        # Download first, then ask for feedback. Satisfied: offer the reasoning.
+        # Not satisfied: the Review tab opens automatically.
+        show_downloads(index, output, None, "overview")
+        satisfied = ask_if_satisfied(index)
+        if satisfied == "Yes":
+            st.success("Thank you. If you would like to see how the tool reached this result:")
+            col_a, col_b, _ = st.columns([1, 1, 1])
+            with col_a:
+                st.button("🔍 Read the step-by-step reasoning", on_click=go_to_tab, args=(TAB_STEPS,),
+                          use_container_width=True, key=f"jump_steps_{index}")
+            with col_b:
+                st.button("📚 See the authorities quoted", on_click=go_to_tab, args=(TAB_STEPS,),
+                          use_container_width=True, key=f"jump_auth_{index}")
+        elif satisfied == "No":
+            st.info("The **Review & re-run** tab has opened: change the findings yourself or run "
+                    "the analysis again with another model, then download the updated report there.")
+            st.button("✏️ Go to Review & re-run", on_click=go_to_tab, args=(TAB_REVIEW,),
+                      key=f"jump_review_{index}")
 
-    show_table_of_authorities(output.get("authorities", []))
-    st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
-               f"AI calls in this run: {output['ai_calls']}")
+    # --- Step-by-step -------------------------------------------------------
+    with tabs[1]:
+        for key in STEP_ORDER:
+            if key in output["results"]:
+                show_step(output["results"][key])
+        show_table_of_authorities(output.get("authorities", []))
+        st.caption(f"Model: {output['model']} | Temperature: {output['temperature']} | "
+                   f"AI calls in this run: {output['ai_calls']}")
 
-    # Satisfied: go straight to the download. Not satisfied: review the findings,
-    # or run again with another model, then download.
-    satisfied = ask_if_satisfied(index)
-    review = None
-    if satisfied == "No":
-        st.write("You can change the findings yourself, run the analysis again with another "
-                 "model, or both.")
+    # --- Review & re-run ---------------------------------------------------
+    with tabs[2]:
+        st.write("Change the findings yourself, run the analysis again with another model, or "
+                 "both. Then download the report below.")
         with st.container(border=True):
             review = show_human_review(index, output)
         with st.container(border=True):
             show_rerun_option(runs)
+        show_downloads(index, output, review, "review")
 
+    # --- Compare models -----------------------------------------------------
     if len(runs) > 1:
-        show_model_comparison(runs)
-
-    if satisfied:
-        show_downloads(index, output, review)
+        with tabs[3]:
+            show_model_comparison(runs)
