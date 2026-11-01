@@ -68,7 +68,11 @@ If a check fails, the failed items are sent back to the AI with an instruction t
 
 **Human in the loop.** After each run the user is asked whether they are satisfied. If not, the "Revise & re-run" tab lets the user correct or add to the facts, choose another model and run the analysis again. All runs of the same description are compared step by step in a table. The comparison is made by code, not by the AI.
 
-**Output.** The result page shows the outcome, a diagram of the steps, a summary, key uncertainties, next steps, the most similar WTO disputes (with links to the WTO pages), the reasoning for each step and a table of authorities. The report can be downloaded as a Word (.docx) or Markdown (.md) file. It includes the comparison of runs and the user's notes where these exist.
+**Output.** The result page shows the outcome, a diagram of the steps, a summary, key uncertainties, next steps, the most similar WTO disputes with links to their WTO pages, the reasoning for each step and a table of authorities.
+
+The user can add their own notes below the result. Press Ctrl+Enter (Mac ⌘+Enter) or click outside the box to save them before downloading.
+
+The report can be downloaded straight away as a Word (.docx) or Markdown (.md) file. If the user is not satisfied, they can revise the facts or choose another model, run the analysis again and download the new report. That report also compares the runs.
 
 ## 4. Test cases
 
@@ -78,7 +82,7 @@ The three test cases are in `test_cases/`. Select one from the "Load a test case
 
 File `test_cases/case_1_separate_retail.txt`
 
-Westland allows imported beef to be sold only in specialist stores, while domestic beef may be sold anywhere. The facts are modelled on *Korea – Beef*.
+Westland allows imported beef to be sold only in specialist stores, while domestic beef may be sold anywhere. 
 
 | Step | Expected |
 |---|---|
@@ -137,11 +141,20 @@ Observed with gpt-4o. Part A gave Uncertain and Part B gave Inconsistent, as exp
 
 It also shows a limitation. In two runs of Part A with the same model and the same facts, Step 8 was answered "Yes" once and "Uncertain" once. A temperature of 0 does not make the model fully deterministic.
 
-### Additional case (optional)
+### Additional case (optional). An origin-neutral packaging rule
 
 File `additional_cases/extra_uncertain_recycled_bottles.txt`, shown in the menu as "(extra)".
 
-An origin-neutral packaging rule with no evidence of its effect on imported products. Expected outcome 🟡 **Uncertain**, with less favourable treatment uncertain. Observed with gpt-4o as expected.
+Lowland requires all bottled water to be sold in bottles made from at least 50 per cent recycled plastic. The rule applies equally to domestic and imported water and does not mention origin. There is no information on how many suppliers already meet the standard or on the cost of switching. Exporters claim the rule will cost them more but provide no figures.
+
+| Step | Expected |
+|---|---|
+| 2 to 6 Like products | Yes |
+| 7 Affecting | Yes |
+| 8 Less favourable treatment | Uncertain (no evidence of a detrimental effect on imported products) |
+| **Outcome** | 🟡 **Uncertain** |
+
+Observed with gpt-4o. The expected outcome. The tool did not treat the exporters' unsupported claim as proof of less favourable treatment.
 
 ## 5. Artefacts for the tests
 
@@ -160,11 +173,11 @@ No API key is stored in this repository.
 
 ## 7. Limitations
 
-- **Case law is summarised, not quoted.** The legal tests summarise WTO case law in the prompts. The reports are not stored, so the quote check applies to the GATT text only. Covering all WTO reports would need a retrieval (RAG) pipeline over the full reports, which would add retrieval errors. The code already supports report excerpts (`knowledge/cases/`, pinpoint checking and the table of authorities), so these can be added later.
+- **Case law is summarised rather than quoted.** The key principles from WTO case law are summarised in the legal test for each step. The full reports are not stored in the tool, so quotes are checked against the GATT text only. Adding the full reports would let the AI quote them directly, but finding the right passages in so large a body of material would bring its own risk of error. The tool is built so that excerpts from the reports can be added later, and they would then be checked in the same way.
 - **The checks test sources, not reasoning.** The fact check confirms that a fact appears in the user's text. It cannot confirm that the AI used the fact correctly. It is also strict, so a quote that drops a few words is flagged even when its meaning is unchanged.
 - **Model and run variation.** Different models, and sometimes repeated runs of the same model, reach different findings on borderline steps. The comparison table makes this visible.
-- **Cautious findings.** Step 2 (physical properties) is sometimes "Uncertain" even when the products are plainly identical. The most similar disputes are sometimes only loosely related.
 - **Scope of the tool.** The tool does not analyse Article III:2, Article II or Article XX.
+- **Likeness is assessed through a fixed set of criteria.** The tool assesses likeness through the four criteria drawn from the Border Tax Adjustments report, one step each, and then weighs them in Step 6. In WTO law these criteria are analytical tools rather than a closed list. Likeness is a case-by-case judgment about the competitive relationship between the products, and other evidence may be relevant. Because each criterion is analysed in a separate step, the tool may treat the test more like a checklist than a panel would, and may give too little weight to evidence that falls outside the four criteria or that bears on several of them at once.
 
 ## 8. Key authorities
 
