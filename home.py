@@ -408,21 +408,15 @@ def show_revise_and_rerun(index, output, runs):
 
 
 def show_notes(index):
-    st.markdown("#### 📝 Your notes")
     key = remember(f"notes_{index}", "")
-    notes = st.text_area("Your notes (included in the report)", key=key, height=120,
-                         on_change=save, args=(key,), label_visibility="collapsed",
-                         placeholder="Your own comments on this analysis. They are added to the report.")
+    notes = st.text_area("📝 Your notes (optional, added to the report)", key=key, height=90,
+                         on_change=save, args=(key,),
+                         placeholder="Your own comments on this analysis.")
     return {"notes": notes.strip()} if notes.strip() else None
 
 
-def saved_notes(index):
-    """The notes typed in the Revise & re-run tab for this run, if any."""
-    notes = st.session_state.get("saved_widgets", {}).get(f"notes_{index}", "").strip()
-    return {"notes": notes} if notes else None
-
-
 def show_downloads(index, output, review, where, runs):
+    """The single download box, in the Overview tab of the run being viewed."""
     with st.container(border=True):
         st.markdown("#### 📥 Download the report")
         parts = ["the outcome", "every step", "the facts and quotes with their check results",
@@ -653,9 +647,10 @@ if runs:
             show_comparison(runs, index)
 
         st.divider()
-        # Download first, then ask for feedback. Satisfied: offer the reasoning.
-        # Not satisfied: the Review tab opens automatically.
-        show_downloads(index, output, saved_notes(index), "overview", runs)
+        # Notes and download first, then ask for feedback. Satisfied: offer the reasoning.
+        # Not satisfied: the Revise & re-run tab opens automatically.
+        notes = show_notes(index)
+        show_downloads(index, output, notes, "overview", runs)
         satisfied = ask_if_satisfied(index)
         if satisfied == "Yes":
             st.success("Thank you. If you would like to see how the tool reached this result:")
@@ -668,8 +663,8 @@ if runs:
                           use_container_width=True, key=f"jump_auth_{index}")
         elif satisfied == "No":
             st.info("The **Revise & re-run** tab has opened: correct or add to the facts, choose a "
-                    "model and run the analysis again. You can also add your notes and download the "
-                    "report there.")
+                    "model and run the analysis again. The new result, a comparison with this run "
+                    "and the download will then appear here in the Overview tab.")
             st.button("✏️ Go to Revise & re-run", on_click=go_to_tab, args=(TAB_REVIEW,),
                       key=f"jump_review_{index}")
 
@@ -686,6 +681,5 @@ if runs:
     with tabs[2]:
         with st.container(border=True):
             show_revise_and_rerun(index, output, runs)
-        with st.container(border=True):
-            review = show_notes(index)
-        show_downloads(index, output, review, "review", runs)
+        st.caption("After the new run, its result, a comparison with the earlier run(s), your notes "
+                   "and the download appear in the **Overview** tab.")
