@@ -16,7 +16,6 @@ from credentials import get_openai_client, select_model
 from report import (STEP_ORDER, build_docx_report, build_markdown_report, comparison_rows,
                     run_label)
 
-APP_PASSWORD = "12436"   # repository is private; move to Streamlit secrets before making it public
 APP_TITLE = "National Treatment Analyser"
 APP_SUBTITLE = "Step-by-step analysis under GATT 1994 Article III:4"
 TEST_CASE_DIR = Path(__file__).parent / "test_cases"            # the 3 official test cases
@@ -75,7 +74,7 @@ def banner(chips=True, login=False):
     if chips:
         chip_html = "<div>" + "".join(f"<span class='nt-chip'>{c}</span>" for c in [
             "⚖️ GATT 1994 Art III:4", "🧭 9 guided steps", "🧮 Outcome decided by fixed rules",
-            "🔎 Quotes and facts checked by code", "✏️ Human review", "🔁 Model comparison",
+            "🔎 Quotes and facts checked by code", "✏️ Revise & re-run", "⚖️ Run comparison",
         ]) + "</div>"
     extra = " nt-login" if login else ""
     st.markdown(f"<div class='nt-banner{extra}'><div class='nt-title'>⚖️ {APP_TITLE}</div>"
@@ -86,9 +85,26 @@ def banner(chips=True, login=False):
 # Password gate
 # ---------------------------------------------------------------------------
 
+def get_app_password():
+    """The app password is kept in Streamlit secrets, not in the code.
+
+    On Streamlit Cloud: app Settings > Secrets. Locally: .streamlit/secrets.toml
+    (this file is listed in .gitignore and is never committed).
+    """
+    try:
+        return st.secrets["APP_PASSWORD"]
+    except Exception:   # no secrets file, or the key is missing
+        return None
+
+
 def password_ok():
     if st.session_state.get("authenticated"):
         return True
+
+    app_password = get_app_password()
+    if not app_password:
+        st.error("The app password has not been set. Add APP_PASSWORD to the app's secrets.")
+        return False
 
     # Centre a narrow login box on the page.
     _, middle, _ = st.columns([1, 1.6, 1])
@@ -110,7 +126,7 @@ def password_ok():
             entered = st.text_input("Password", type="password")
             submitted = st.form_submit_button("Enter", type="primary")
         if submitted:
-            if hmac.compare_digest(entered, APP_PASSWORD):
+            if hmac.compare_digest(entered, str(app_password)):
                 st.session_state["authenticated"] = True
                 st.rerun()
             else:
