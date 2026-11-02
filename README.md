@@ -206,8 +206,12 @@ Many reports are relevant to Article III:4. The tool relies on the most importan
 
 ```bash
 pip install -r requirements.txt
+mkdir -p .streamlit
+echo 'APP_PASSWORD = "<the password provided with the submission>"' > .streamlit/secrets.toml
 streamlit run home.py
 ```
+
+The app password is read from Streamlit secrets and is not stored in the repository. On Streamlit Cloud it is set in the app's Settings under Secrets. Locally it is read from `.streamlit/secrets.toml`, which is excluded from Git.
 
 ## 10. Repository structure
 
