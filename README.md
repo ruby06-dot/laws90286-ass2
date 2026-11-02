@@ -6,7 +6,7 @@ A Streamlit application that analyses, step by step, whether a government measur
 
 | | |
 |---|---|
-| Deployed application | https://YOUR-APP-NAME.streamlit.app *(to be replaced with the deployed URL)* |
+| Deployed application | https://d8mmc7kapwafftjm7vhgnw.streamlit.app/ |
 | Password | Provided with the submission |
 | API key | Enter your own OpenAI API key in the sidebar and click "Update API Key" |
 | Recommended model | `gpt-4o` (the test cases were checked with this model) |
