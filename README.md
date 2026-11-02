@@ -23,7 +23,9 @@ Article III:4 requires that imported products be accorded treatment no less favo
 2. The measure is a **law, regulation or requirement affecting** their internal sale or use.
 3. The imported products are accorded **less favourable treatment**.
 
-Before these elements, the measure must fall within the **scope** of Article III:4. Taxes and charges fall under Article III:2 (internal taxes) or Article II (customs duties and import charges). Import bans and quotas fall under Article XI.
+Before these elements, the measure must fall within the **scope** of Article III:4. Taxes and charges fall under Article III:2 (internal taxes) or Article II (customs duties and import charges). Import bans and quotas that apply only to imported products fall under Article XI.
+
+Each stage of this analysis turns on factors that are easy to overlook, such as when the obligation to pay a charge arises, how health risks bear on likeness, and whether a measure changes the conditions of competition. I built this tool to test whether an AI can apply this structure reliably and reach reasonably accurate answers.
 
 The tool does not analyse Article III:2, Article II or justification under Article XX. Where Article III:2 or Article II is more likely to apply, Step 1 says so.
 
@@ -77,6 +79,14 @@ The report can be downloaded straight away as a Word (.docx) or Markdown (.md) f
 ## 4. Test cases
 
 The three test cases are in `test_cases/`. Select one from the "Load a test case" menu and click **Load**, or upload the `.txt` file with the **Upload** button. Then click **Run analysis**.
+
+The cases were chosen so that each one tests a different path through the tool.
+
+| Test case | Expected outcome | Why it was chosen |
+|---|---|---|
+| 1. Separate retail channels for imported beef | 🔴 Inconsistent | A clear violation. It shows the full analysis when all three elements are met |
+| 2. An import charge collected inside the country | 🔵 Article III:4 does not apply | A scope trap. It tests whether Step 1 recognises a measure that belongs under Article II or Article III:2, and shows how the tool was improved after it first failed |
+| 3. Incomplete facts, then revise and re-run | 🟡 Uncertain, then 🔴 Inconsistent | Missing facts. It tests whether the tool avoids inventing facts, and shows the revise and re-run feature and the comparison of runs |
 
 ### Test case 1. Separate retail channels for imported beef
 
@@ -142,6 +152,8 @@ Observed with gpt-4o. Part A gave Uncertain and Part B gave Inconsistent, as exp
 It also shows a limitation. In two runs of Part A with the same model and the same facts, Step 8 was answered "Yes" once and "Uncertain" once. A temperature of 0 does not make the model fully deterministic.
 
 ### Additional case (optional). An origin-neutral packaging rule
+
+Why it was chosen. Test case 3 is uncertain because facts are missing and can be supplied. This case is uncertain because the evidence on less favourable treatment is unsupported, so it tests whether the tool treats an unproven claim as proof.
 
 File `additional_cases/extra_uncertain_recycled_bottles.txt`, shown in the menu as "(extra)".
 
