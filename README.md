@@ -173,21 +173,22 @@ No API key is stored in this repository.
 
 ## 7. Limitations
 
+- **Only the most important authorities are included.** Many WTO and GATT reports bear on Article III:4. The tool draws on a selection of the most important ones (section 8), so its analysis may miss points that other reports would raise and may be less accurate in less common situations.
 - **Case law is summarised rather than quoted.** The key principles from WTO case law are summarised in the legal test for each step. The full reports are not stored in the tool, so quotes are checked against the GATT text only. Adding the full reports would let the AI quote them directly, but finding the right passages in so large a body of material would bring its own risk of error. The tool is built so that excerpts from the reports can be added later, and they would then be checked in the same way.
+- **Likeness is assessed through a fixed set of criteria.** The tool assesses likeness through the four criteria drawn from the Border Tax Adjustments report, one step each, and then weighs them in Step 6. In WTO law these criteria are analytical tools rather than a closed list. Likeness is a case-by-case judgment about the competitive relationship between the products, and other evidence may be relevant. Because each criterion is analysed in a separate step, the tool may treat the test more like a checklist than a panel would, and may give too little weight to evidence that falls outside the four criteria or that bears on several of them at once.
 - **The checks test sources, not reasoning.** The fact check confirms that a fact appears in the user's text. It cannot confirm that the AI used the fact correctly. It is also strict, so a quote that drops a few words is flagged even when its meaning is unchanged.
 - **Model and run variation.** Different models, and sometimes repeated runs of the same model, reach different findings on borderline steps. The comparison table makes this visible.
 - **Scope of the tool.** The tool does not analyse Article III:2, Article II or Article XX.
-- **Likeness is assessed through a fixed set of criteria.** The tool assesses likeness through the four criteria drawn from the Border Tax Adjustments report, one step each, and then weighs them in Step 6. In WTO law these criteria are analytical tools rather than a closed list. Likeness is a case-by-case judgment about the competitive relationship between the products, and other evidence may be relevant. Because each criterion is analysed in a separate step, the tool may treat the test more like a checklist than a panel would, and may give too little weight to evidence that falls outside the four criteria or that bears on several of them at once.
 
 ## 8. Key authorities
+
+Many reports are relevant to Article III:4. The tool relies on the most important of them, listed below. A wider list of disputes, used only to find similar cases, is in `knowledge/cases/`.
 
 - Appellate Body Report, *Korea – Measures Affecting Imports of Fresh, Chilled and Frozen Beef*, WTO Doc WT/DS161/AB/R, WT/DS169/AB/R (11 December 2000)
 - Appellate Body Report, *European Communities – Measures Affecting Asbestos and Asbestos-Containing Products*, WTO Doc WT/DS135/AB/R (12 March 2001)
 - Appellate Body Report, *China – Measures Affecting Imports of Automobile Parts*, WTO Doc WT/DS339/AB/R, WT/DS340/AB/R, WT/DS342/AB/R (15 December 2008)
 - Appellate Body Report, *Thailand – Customs and Fiscal Measures on Cigarettes from the Philippines*, WTO Doc WT/DS371/AB/R (17 June 2011)
 - Appellate Body Report, *European Communities – Measures Prohibiting the Importation and Marketing of Seal Products*, WTO Doc WT/DS400/AB/R, WT/DS401/AB/R (22 May 2014)
-
-The full list of disputes used to find similar cases is in `knowledge/cases/`.
 
 ## 9. Running locally
 
@@ -212,3 +213,17 @@ additional_cases/    The optional additional case
 .streamlit/          Theme settings
 requirements.txt     Python packages
 ```
+## 11. Technologies used
+
+- **Python and Streamlit.** Application logic, the interface, session state and the password gate. Deployed on Streamlit Community Cloud.
+- **OpenAI Python SDK.** One Chat Completions call per step, with JSON output and a temperature of 0 where the model allows it. The model list is read from the user's API key. `gpt-4o` is the default.
+- **python-docx.** The downloadable Word report.
+- **Python standard library.** The quote and fact checks use ordinary string matching, so they do not depend on the AI.
+
+The tool does not use embeddings or a vector database. Each step receives a short, fixed legal test and the relevant treaty text, which is small enough to send in full.
+
+## 12. Acknowledgements
+
+The legal task, the choice of steps, the legal tests and the test cases were designed by the author. Claude (Anthropic) assisted with coding, debugging, drafting the test cases and this README. All test cases are fictional, and the tool's output requires human review.
+
+The API credentials sidebar is based on the course module by the subject teacher (section 6).
