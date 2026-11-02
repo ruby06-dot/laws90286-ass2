@@ -219,10 +219,11 @@ requirements.txt     Python packages
 - **OpenAI Python SDK.** One Chat Completions call per step, with JSON output and a temperature of 0 where the model allows it. The model list is read from the user's API key. `gpt-4o` is the default.
 - **python-docx.** The downloadable Word report.
 - **Python standard library.** The quote and fact checks use ordinary string matching, so they do not depend on the AI.
+The tool does not use embeddings or a vector database. Each step receives a short, fixed legal test and the relevant treaty text, which is small enough to send in full.
 
 
 ## 12. Acknowledgements
 
-The legal task, the choice of steps, the legal tests and the test cases were designed by the author. Claude (Anthropic) assisted with coding, debugging, modifying the test cases and this README. All test cases are fictional, and the tool's output requires human review.
+The legal task, the choice of steps, the legal tests and the test cases were designed by the author. Claude assisted with coding, debugging, modifying the test cases and this README. All test cases are fictional, and the tool's output requires human review.
 
-The API credentials sidebar is based on the course module (section 6).
+The API credentials sidebar is based on the course module.
