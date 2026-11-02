@@ -220,10 +220,9 @@ requirements.txt     Python packages
 - **python-docx.** The downloadable Word report.
 - **Python standard library.** The quote and fact checks use ordinary string matching, so they do not depend on the AI.
 
-The tool does not use embeddings or a vector database. Each step receives a short, fixed legal test and the relevant treaty text, which is small enough to send in full.
 
 ## 12. Acknowledgements
 
-The legal task, the choice of steps, the legal tests and the test cases were designed by the author. Claude (Anthropic) assisted with coding, debugging, drafting the test cases and this README. All test cases are fictional, and the tool's output requires human review.
+The legal task, the choice of steps, the legal tests and the test cases were designed by the author. Claude (Anthropic) assisted with coding, debugging, modifying the test cases and this README. All test cases are fictional, and the tool's output requires human review.
 
-The API credentials sidebar is based on the course module by the subject teacher (section 6).
+The API credentials sidebar is based on the course module (section 6).
